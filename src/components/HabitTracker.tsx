@@ -93,7 +93,7 @@ export function HabitTracker() {
       const habitsFromSupabase = await getHabits();
       setHabits(habitsFromSupabase);
     } catch (error) {
-      console.error("Failed to load habits from Supabase", error);
+      console.error("Failed to load habits", error);
       toast({ variant: 'destructive', title: 'Error fetching habits.' });
     } finally {
       setIsLoading(false);
@@ -159,8 +159,8 @@ export function HabitTracker() {
     const newStreak = calculateStreak(newCompletions);
     
     try {
-        await updateHabit(habitId, { completions: newCompletions, streak: newStreak });
-        setHabits(habits.map(h => h.id === habitId ? { ...h, completions: newCompletions, streak: newStreak } : h));
+        const updatedHabit = await updateHabit(habitId, { completions: newCompletions, streak: newStreak });
+        setHabits(habits.map(h => h.id === habitId ? { ...h, ...updatedHabit } : h));
     } catch (error) {
         console.error("Failed to update habit", error);
         toast({ variant: 'destructive', title: 'Failed to update habit.' });

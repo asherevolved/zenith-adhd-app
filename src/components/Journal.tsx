@@ -27,7 +27,7 @@ export function Journal() {
       const entries = await getJournalEntries();
       setSavedEntries(entries);
     } catch (error) {
-      console.error('Failed to load journal entries from Supabase', error);
+      console.error('Failed to load journal entries', error);
       toast({
         title: 'Error',
         description: 'Could not load journal entries.',
@@ -62,7 +62,7 @@ export function Journal() {
       });
       setJournalEntry(''); // Clear textarea after saving
     } catch (error) {
-      console.error('Failed to save journal entry to Supabase', error);
+      console.error('Failed to save journal entry', error);
       toast({
         title: 'Error',
         description: 'Could not save the journal entry.',

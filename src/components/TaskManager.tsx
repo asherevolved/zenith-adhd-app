@@ -117,7 +117,7 @@ export function TaskManager() {
       const tasksFromSupabase = await getTasks();
       setTasks(tasksFromSupabase);
     } catch (error) {
-      console.error("Failed to load tasks from Supabase", error);
+      console.error("Failed to load tasks", error);
       toast({ variant: 'destructive', title: 'Error fetching tasks.' });
     } finally {
       setIsLoading(false);
@@ -221,9 +221,9 @@ export function TaskManager() {
 
   const toggleTaskCompletion = async (id: string, isCompleted: boolean) => {
     try {
-        await updateTask(id, { isCompleted });
+        const updatedTask = await updateTask(id, { isCompleted });
         setTasks(tasks.map(task => 
-          task.id === id ? { ...task, isCompleted } : task
+          task.id === id ? { ...task, ...updatedTask } : task
         ));
     } catch(error) {
         console.error("Failed to update task", error);
@@ -241,8 +241,8 @@ export function TaskManager() {
     const allSubtasksCompleted = updatedSubtasks.every(st => st.isCompleted);
     
     try {
-        await updateTask(taskId, { subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted });
-        setTasks(tasks.map(t => t.id === taskId ? { ...t, subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted } : t));
+        const updatedTask = await updateTask(taskId, { subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted });
+        setTasks(tasks.map(t => t.id === taskId ? { ...t, ...updatedTask } : t));
     } catch(error) {
         console.error("Failed to update subtask", error);
         toast({ variant: 'destructive', title: 'Failed to update subtask.' });
