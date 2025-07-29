@@ -158,7 +158,7 @@ export function Dashboard() {
             <Trophy className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{longestStreak} days</div>
+            <div className="text-2xl font-bold">{longestStreak}</div>
             <p className="text-xs text-muted-foreground">Incredible consistency!</p>
           </CardContent>
         </Card>
@@ -258,7 +258,7 @@ export function Dashboard() {
           <CardHeader>
             <CardTitle>Task Completion</CardTitle>
             <CardDescription>A breakdown of your current tasks.</CardDescription>
-          </CardHeader>
+          </Header>
           <CardContent className="flex justify-center pl-2">
             <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
               <PieChart>
