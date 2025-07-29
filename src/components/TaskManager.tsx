@@ -252,110 +252,112 @@ export function TaskManager() {
   });
 
   return (
-    <div className="flex h-full flex-col mt-16">
-      <Tabs defaultValue="today" className="flex flex-1 flex-col">
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="today">Today</TabsTrigger>
-            <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-            <TabsTrigger value="someday">Someday</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
-          </TabsList>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="mr-2 size-4" /> Add Task
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create a new task</DialogTitle>
-              </DialogHeader>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-4">
-                {/* Left Column */}
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="title">Title</Label>
-                    <Input id="title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="e.g. Call therapist" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label htmlFor="notes">Notes</Label>
-                    <Textarea id="notes" value={newTaskNotes} onChange={(e) => setNewTaskNotes(e.target.value)} placeholder="Add details..." className="mt-1" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                      <div>
-                         <Label htmlFor="priority">Priority</Label>
-                         <Select value={newTaskPriority} onValueChange={(v) => setNewTaskPriority(v as Task['priority'])}>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Select priority" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Low">Low</SelectItem>
-                            <SelectItem value="Medium">Medium</SelectItem>
-                            <SelectItem value="Urgent">Urgent</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="status">Status</Label>
-                        <Select value={newTaskStatus} onValueChange={(v) => setNewTaskStatus(v as Task['status'])}>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Today">Today</SelectItem>
-                            <SelectItem value="Upcoming">Upcoming</SelectItem>
-                            <SelectItem value="Someday">Someday</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                  </div>
-                   <div>
-                    <Label htmlFor="reminder">Reminder</Label>
-                     <Select value={newReminder} onValueChange={setNewReminder}>
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Task Manager</h1>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <PlusCircle className="mr-2 size-4" /> Add Task
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Create a new task</DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-4">
+              {/* Left Column */}
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="title">Title</Label>
+                  <Input id="title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="e.g. Call therapist" className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea id="notes" value={newTaskNotes} onChange={(e) => setNewTaskNotes(e.target.value)} placeholder="Add details..." className="mt-1" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                       <Label htmlFor="priority">Priority</Label>
+                       <Select value={newTaskPriority} onValueChange={(v) => setNewTaskPriority(v as Task['priority'])}>
                         <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="No reminder" />
+                          <SelectValue placeholder="Select priority" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="0">No reminder</SelectItem>
-                            <SelectItem value="2">2 minutes</SelectItem>
-                            <SelectItem value="5">5 minutes</SelectItem>
-                            <SelectItem value="10">10 minutes</SelectItem>
+                          <SelectItem value="Low">Low</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="Urgent">Urgent</SelectItem>
                         </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                {/* Right Column */}
-                <div className="space-y-4">
-                  <div>
-                    <Label>Subtasks</Label>
-                    <div className="mt-1 space-y-2 max-h-48 overflow-y-auto pr-2">
-                       {subtasks.map((subtask, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Input
-                            value={subtask.title}
-                            onChange={(e) => handleSubtaskChange(index, e.target.value)}
-                            placeholder={`Subtask ${index + 1}`}
-                          />
-                          <Button variant="ghost" size="icon" onClick={() => removeSubtaskInput(index)} disabled={subtasks.length === 1}>
-                            <X className="size-4" />
-                          </Button>
-                        </div>
-                      ))}
+                      </Select>
                     </div>
-                    <Button variant="link" size="sm" onClick={addSubtaskInput} className="mt-1 px-0">
-                      <PlusCircle className="mr-2 size-4" /> Add Subtask
-                    </Button>
-                  </div>
+                    <div>
+                      <Label htmlFor="status">Status</Label>
+                      <Select value={newTaskStatus} onValueChange={(v) => setNewTaskStatus(v as Task['status'])}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Today">Today</SelectItem>
+                          <SelectItem value="Upcoming">Upcoming</SelectItem>
+                          <SelectItem value="Someday">Someday</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                </div>
+                 <div>
+                  <Label htmlFor="reminder">Reminder</Label>
+                   <Select value={newReminder} onValueChange={setNewReminder}>
+                      <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="No reminder" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="0">No reminder</SelectItem>
+                          <SelectItem value="2">2 minutes</SelectItem>
+                          <SelectItem value="5">5 minutes</SelectItem>
+                          <SelectItem value="10">10 minutes</SelectItem>
+                      </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <DialogFooter>
-                <DialogClose asChild><Button variant="ghost" onClick={resetForm}>Cancel</Button></DialogClose>
-                <Button onClick={addTask}>Create Task</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+              {/* Right Column */}
+              <div className="space-y-4">
+                <div>
+                  <Label>Subtasks</Label>
+                  <div className="mt-1 space-y-2 max-h-48 overflow-y-auto pr-2">
+                     {subtasks.map((subtask, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Input
+                          value={subtask.title}
+                          onChange={(e) => handleSubtaskChange(index, e.target.value)}
+                          placeholder={`Subtask ${index + 1}`}
+                        />
+                        <Button variant="ghost" size="icon" onClick={() => removeSubtaskInput(index)} disabled={subtasks.length === 1}>
+                          <X className="size-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="link" size="sm" onClick={addSubtaskInput} className="mt-1 px-0">
+                    <PlusCircle className="mr-2 size-4" /> Add Subtask
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild><Button variant="ghost" onClick={resetForm}>Cancel</Button></DialogClose>
+              <Button onClick={addTask}>Create Task</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Tabs defaultValue="today" className="flex flex-1 flex-col mt-4">
+        <TabsList>
+          <TabsTrigger value="today">Today</TabsTrigger>
+          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+          <TabsTrigger value="someday">Someday</TabsTrigger>
+          <TabsTrigger value="completed">Completed</TabsTrigger>
+        </TabsList>
         <div className="mt-4 flex-1">
           <TabsContent value="today" className="space-y-4">
             {filteredTasks('Today').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
