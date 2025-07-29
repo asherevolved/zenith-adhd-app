@@ -29,10 +29,13 @@ import { MindfulMeLogo } from './icons/Logo';
 import { Button } from './ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { parseVoiceCommand } from '@/ai/flows/voice-command-parser';
+import { AnimeNavBar } from './ui/anime-navbar';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const handleVoiceCommand = async () => {
     toast({
@@ -70,8 +73,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: '/settings', label: 'Settings', icon: Settings },
   ];
 
+  const animeNavItems = menuItems.map(item => ({ name: item.label, url: item.href, icon: item.icon }))
+
   return (
     <SidebarProvider>
+      {!isMobile && <AnimeNavBar items={animeNavItems} defaultActive="Dashboard" />}
       <Sidebar>
         <SidebarHeader>
           <div className="flex items-center gap-2">

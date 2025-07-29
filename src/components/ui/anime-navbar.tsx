@@ -23,22 +23,20 @@ export function AnimeNavBar({ items, className, defaultActive = "Home" }: NavBar
   const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
   const [hoveredTab, setHoveredTab] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<string>(defaultActive)
-  const [isMobile, setIsMobile] = useState(false)
+
+  const activeItem = items.find((item) => item.url === pathname);
+  const [activeTab, setActiveTab] = useState<string>(activeItem?.name || defaultActive)
 
   useEffect(() => {
     setMounted(true)
   }, [])
-
+  
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768)
+    const currentActiveItem = items.find((item) => item.url === pathname);
+    if (currentActiveItem) {
+      setActiveTab(currentActiveItem.name);
     }
-
-    handleResize()
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
+  }, [pathname, items]);
 
   if (!mounted) return null
 
@@ -64,8 +62,7 @@ export function AnimeNavBar({ items, className, defaultActive = "Home" }: NavBar
               <Link
                 key={item.name}
                 href={item.url}
-                onClick={(e) => {
-                  e.preventDefault()
+                onClick={() => {
                   setActiveTab(item.name)
                 }}
                 onMouseEnter={() => setHoveredTab(item.name)}
