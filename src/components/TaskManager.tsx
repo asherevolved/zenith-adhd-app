@@ -36,7 +36,7 @@ function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, o
   const progress = task.subtasks.length > 0 ? (completedSubtasks / task.subtasks.length) * 100 : (task.isCompleted ? 100 : 0);
 
   return (
-    <div className="bg-card/80 backdrop-blur-sm transition-all hover:bg-card p-4 rounded-lg border">
+    <div className="bg-card/50 transition-all hover:bg-card/70 p-4 rounded-lg border">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 flex-1">
           <Checkbox checked={task.isCompleted} onCheckedChange={() => onToggle(task.id)} className="size-5" />
@@ -103,7 +103,7 @@ export function TaskManager() {
   const [newTaskPriority, setNewTaskPriority] = React.useState<Task['priority']>('Medium');
   const [newTaskStatus, setNewTaskStatus] = React.useState<Task['status']>('Today');
   const [subtasks, setSubtasks] = React.useState<Partial<Subtask>[]>([{ title: '' }]);
-  const [newReminder, setNewReminder] = React.useState<string>("0");
+  const [newReminder, setNewReminder] = React.useState('');
 
   React.useEffect(() => {
     try {
@@ -138,7 +138,7 @@ export function TaskManager() {
   };
 
   const scheduleNotification = (task: Task) => {
-    if (!task.reminder || task.reminder === 0) return;
+    if (!task.reminder || task.reminder <= 0) return;
 
     const reminderTime = new Date(new Date().getTime() + task.reminder * 60000);
     
@@ -158,7 +158,7 @@ export function TaskManager() {
     setNewTaskPriority('Medium');
     setNewTaskStatus('Today');
     setSubtasks([{ title: '' }]);
-    setNewReminder("0");
+    setNewReminder('');
     setIsDialogOpen(false);
   }
 
@@ -301,18 +301,15 @@ export function TaskManager() {
                     </div>
                 </div>
                  <div>
-                  <Label htmlFor="reminder">Reminder</Label>
-                   <Select value={newReminder} onValueChange={setNewReminder}>
-                      <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="No reminder" />
-                      </SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="0">No reminder</SelectItem>
-                          <SelectItem value="2">2 minutes</SelectItem>
-                          <SelectItem value="5">5 minutes</SelectItem>
-                          <SelectItem value="10">10 minutes</SelectItem>
-                      </SelectContent>
-                  </Select>
+                  <Label htmlFor="reminder">Reminder (in minutes)</Label>
+                   <Input 
+                    id="reminder"
+                    type="number"
+                    value={newReminder}
+                    onChange={(e) => setNewReminder(e.target.value)}
+                    placeholder="e.g. 15"
+                    className="mt-1"
+                   />
                 </div>
               </div>
               {/* Right Column */}
@@ -354,20 +351,20 @@ export function TaskManager() {
           <TabsTrigger value="someday">Someday</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
         </TabsList>
-        <div className="mt-4 flex-1">
-          <TabsContent value="today" className="space-y-4">
+        <div className="mt-4 flex-1 space-y-4">
+          <TabsContent value="today" className="space-y-4 m-0">
             {filteredTasks('Today').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
             {filteredTasks('Today').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for today. Great job!</p>}
           </TabsContent>
-          <TabsContent value="upcoming" className="space-y-4">
+          <TabsContent value="upcoming" className="space-y-4 m-0">
             {filteredTasks('Upcoming').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
             {filteredTasks('Upcoming').length === 0 && <p className="text-center text-muted-foreground pt-10">No upcoming tasks.</p>}
           </TabsContent>
-          <TabsContent value="someday" className="space-y-4">
+          <TabsContent value="someday" className="space-y-4 m-0">
             {filteredTasks('Someday').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
             {filteredTasks('Someday').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for someday.</p>}
           </TabsContent>
-          <TabsContent value="completed" className="space-y-4">
+          <TabsContent value="completed" className="space-y-4 m-0">
             {filteredTasks('Completed').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
             {filteredTasks('Completed').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks completed yet.</p>}
           </TabsContent>
