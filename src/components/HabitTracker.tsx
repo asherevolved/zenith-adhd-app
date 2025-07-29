@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Flame, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -15,20 +15,26 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAppContext } from '@/context/AppContext';
+import { format, eachDayOfInterval, startOfWeek, endOfWeek } from 'date-fns';
 
 export function HabitTracker() {
-  const [habits, setHabits] = React.useState<any[]>([]);
+  const { habits, addHabit, toggleHabit } = useAppContext();
   const [newHabitName, setNewHabitName] = React.useState('');
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
-  const addHabit = () => {
+  const handleAddHabit = () => {
     if (!newHabitName.trim()) return;
-    // Mock adding habit
-    setHabits([...habits, { id: crypto.randomUUID(), name: newHabitName, streak: 0, completions: {} }]);
+    addHabit(newHabitName);
     setNewHabitName('');
     setIsDialogOpen(false);
   };
   
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
+  const daysOfWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -54,7 +60,7 @@ export function HabitTracker() {
                   onChange={(e) => setNewHabitName(e.target.value)}
                   placeholder="e.g. Meditate for 10 minutes"
                   className="col-span-3"
-                  onKeyDown={(e) => { if (e.key === 'Enter') addHabit() }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddHabit() }}
                 />
               </div>
             </div>
@@ -62,22 +68,44 @@ export function HabitTracker() {
               <DialogClose asChild>
                  <Button variant="ghost">Cancel</Button>
               </DialogClose>
-              <Button onClick={addHabit}>Save Habit</Button>
+              <Button onClick={handleAddHabit}>Save Habit</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
       {habits.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
           {habits.map(habit => (
             <Card key={habit.id}>
               <CardHeader>
-                <CardTitle>{habit.name}</CardTitle>
-                <CardDescription>Streak: {habit.streak} days</CardDescription>
+                <CardTitle className="flex items-center justify-between">
+                  <span>{habit.name}</span>
+                  <div className="flex items-center gap-1 text-orange-400">
+                    <Flame className="size-5" />
+                    <span className="font-bold">{habit.streak}</span>
+                  </div>
+                </CardTitle>
+                <CardDescription>Track your progress for the week.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Track your progress here.</p>
+              <CardContent className="flex justify-around items-center pt-2">
+                 {daysOfWeek.map(day => {
+                   const dayStr = format(day, 'yyyy-MM-dd');
+                   const isCompleted = habit.completions[dayStr];
+                   return (
+                     <div key={dayStr} className="flex flex-col items-center gap-2">
+                       <span className="text-xs text-muted-foreground">{format(day, 'E')}</span>
+                       <Button
+                         variant={isCompleted ? 'default' : 'outline'}
+                         size="icon"
+                         className={`size-10 rounded-full ${dayStr === today ? 'border-primary' : ''}`}
+                         onClick={() => toggleHabit(habit.id, dayStr)}
+                       >
+                         <Check className={`size-5 ${isCompleted ? '' : 'text-transparent'}`} />
+                       </Button>
+                     </div>
+                   );
+                 })}
               </CardContent>
             </Card>
           ))}

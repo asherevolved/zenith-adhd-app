@@ -22,23 +22,9 @@ import {
   ChartTooltipContent,
   ChartConfig
 } from '@/components/ui/chart';
-import { CheckCircle2, Target, Trophy, Sparkles } from 'lucide-react';
-
-const mockData = {
-  tasksCompleted: 12,
-  habitsTracked: 4,
-  habitStreak: 15,
-  badgesUnlocked: 3,
-  weeklyProgress: [
-    { day: 'Mon', tasks: 2, habits: 1 },
-    { day: 'Tue', tasks: 3, habits: 1 },
-    { day: 'Wed', tasks: 1, habits: 1 },
-    { day: 'Thu', tasks: 4, habits: 1 },
-    { day: 'Fri', tasks: 2, habits: 0 },
-    { day: 'Sat', tasks: 0, habits: 0 },
-    { day: 'Sun', tasks: 0, habits: 0 },
-  ],
-};
+import { CheckCircle2, Target, Trophy, Sparkles, BookOpen } from 'lucide-react';
+import { useAppContext } from '@/context/AppContext';
+import { eachDayOfInterval, startOfWeek, endOfWeek, format, isSameDay } from 'date-fns';
 
 const chartConfig = {
   tasks: {
@@ -52,12 +38,37 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export function Dashboard() {
-  const [data, setData] = React.useState(mockData);
+  const { tasks, habits } = useAppContext();
 
-  // In a real app, you would fetch this data from an API
-  // useEffect(() => {
-  //   fetch('/api/dashboard-data').then(res => res.json()).then(setData);
-  // }, []);
+  const tasksCompleted = tasks.filter(t => t.isCompleted).length;
+  const activeHabits = habits.length;
+  
+  const longestHabitStreak = React.useMemo(() => {
+    return habits.reduce((maxStreak, habit) => {
+      return Math.max(maxStreak, habit.streak);
+    }, 0);
+  }, [habits]);
+
+  const weeklyProgress = React.useMemo(() => {
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+    const daysOfWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+    return daysOfWeek.map(day => {
+      const formattedDay = format(day, 'yyyy-MM-dd');
+      const tasksDone = tasks.filter(t => t.isCompleted && t.dueDate === formattedDay).length;
+      const habitsDone = habits.filter(h => h.completions[formattedDay]).length;
+      return {
+        day: format(day, 'E'),
+        tasks: tasksDone,
+        habits: habitsDone,
+      };
+    });
+  }, [tasks, habits]);
+
+  // A simple way to calculate "badges" or achievements
+  const badgesUnlocked = Math.floor(tasksCompleted / 5) + Math.floor(longestHabitStreak / 7);
 
   return (
     <div className="space-y-6">
@@ -65,7 +76,7 @@ export function Dashboard() {
         <CardHeader>
           <CardTitle className="font-headline text-3xl">Dashboard</CardTitle>
           <CardDescription>
-            Welcome back! Here's a snapshot of your progress.
+            Welcome back! Here's a real-time snapshot of your progress.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -77,18 +88,18 @@ export function Dashboard() {
             <CheckCircle2 className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.tasksCompleted}</div>
-            <p className="text-xs text-muted-foreground">+2 from last week</p>
+            <div className="text-2xl font-bold">{tasksCompleted}</div>
+            <p className="text-xs text-muted-foreground">Across all time</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Habits Tracked</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Habits</CardTitle>
             <Target className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.habitsTracked}</div>
-            <p className="text-xs text-muted-foreground">4 active habits</p>
+            <div className="text-2xl font-bold">{activeHabits}</div>
+            <p className="text-xs text-muted-foreground">Currently tracking</p>
           </CardContent>
         </Card>
         <Card>
@@ -97,7 +108,7 @@ export function Dashboard() {
             <Trophy className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.habitStreak}</div>
+            <div className="text-2xl font-bold">{longestHabitStreak}</div>
             <p className="text-xs text-muted-foreground">day streak</p>
           </CardContent>
         </Card>
@@ -107,7 +118,7 @@ export function Dashboard() {
             <Sparkles className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.badgesUnlocked}</div>
+            <div className="text-2xl font-bold">{badgesUnlocked}</div>
             <p className="text-xs text-muted-foreground">badges unlocked</p>
           </CardContent>
         </Card>
@@ -122,14 +133,13 @@ export function Dashboard() {
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.weeklyProgress} accessibilityLayer>
+                <BarChart data={weeklyProgress} accessibilityLayer>
                   <CartesianGrid vertical={false} />
                   <XAxis
                     dataKey="day"
                     tickLine={false}
                     tickMargin={10}
                     axisLine={false}
-                    tickFormatter={(value) => value.slice(0, 3)}
                   />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />

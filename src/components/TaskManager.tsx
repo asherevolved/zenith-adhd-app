@@ -24,6 +24,7 @@ import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useAppContext } from '@/context/AppContext';
 
 const priorityColors = {
   Urgent: 'border-red-500/50 text-red-400',
@@ -31,7 +32,8 @@ const priorityColors = {
   Low: 'border-green-500/50 text-green-400',
 };
 
-function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, onToggle: (id: string, isCompleted: boolean) => void, onDelete: (id: string) => void, onSubtaskToggle: (taskId: string, subtaskId: string, isCompleted: boolean) => void }) {
+function TaskItem({ task }: { task: Task }) {
+  const { toggleTaskCompletion, deleteTask, toggleSubtaskCompletion } = useAppContext();
   const completedSubtasks = task.subtasks.filter(st => st.isCompleted).length;
   const progress = task.subtasks.length > 0 ? (completedSubtasks / task.subtasks.length) * 100 : (task.isCompleted ? 100 : 0);
 
@@ -39,7 +41,7 @@ function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, o
     <div className="bg-transparent transition-all p-4 rounded-lg">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 flex-1">
-          <Checkbox checked={task.isCompleted} onCheckedChange={(checked) => onToggle(task.id, !!checked)} className="size-5" />
+          <Checkbox checked={task.isCompleted} onCheckedChange={(checked) => toggleTaskCompletion(task.id, !!checked)} className="size-5" />
           <div className={`text-base font-medium ${task.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
             {task.title}
           </div>
@@ -53,10 +55,10 @@ function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, o
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => onToggle(task.id, !task.isCompleted)}>
+              <DropdownMenuItem onClick={() => toggleTaskCompletion(task.id, !task.isCompleted)}>
                 {task.isCompleted ? 'Mark as Not Done' : 'Mark as Done'}
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-400" onClick={() => onDelete(task.id)}>
+              <DropdownMenuItem className="text-red-400" onClick={() => deleteTask(task.id)}>
                 <Trash2 className="mr-2 size-4" />
                 Delete
               </DropdownMenuItem>
@@ -74,7 +76,7 @@ function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, o
                 <Checkbox
                   id={`subtask-${subtask.id}`}
                   checked={subtask.isCompleted}
-                  onCheckedChange={(checked) => onSubtaskToggle(task.id, subtask.id, !!checked)}
+                  onCheckedChange={(checked) => toggleSubtaskCompletion(task.id, subtask.id, !!checked)}
                   className="size-4"
                 />
                 <Label htmlFor={`subtask-${subtask.id}`} className={`text-sm ${subtask.isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
@@ -94,8 +96,8 @@ function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, o
 }
 
 export function TaskManager() {
+  const { tasks, addTask } = useAppContext();
   const { toast } = useToast();
-  const [tasks, setTasks] = React.useState<Task[]>([]);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   
   const [newTaskTitle, setNewTaskTitle] = React.useState('');
@@ -115,7 +117,7 @@ export function TaskManager() {
     setIsDialogOpen(false);
   }
 
-  const addTask = async () => {
+  const handleAddTask = async () => {
     if (!newTaskTitle.trim()) return;
     
     const finalSubtasks = subtasks
@@ -126,19 +128,17 @@ export function TaskManager() {
             isCompleted: false
         }));
 
-    const newTask: Task = {
-      id: crypto.randomUUID(),
+    const newTask: Omit<Task, 'id' | 'isCompleted' | 'created_at'> = {
       title: newTaskTitle,
       notes: newTaskNotes,
       dueDate: format(new Date(), 'yyyy-MM-dd'),
       priority: newTaskPriority,
       status: newTaskStatus,
-      isCompleted: false,
       subtasks: finalSubtasks,
     };
 
-    setTasks([newTask, ...tasks]);
-    toast({ title: "Task Added", description: "Your task has been added locally."})
+    addTask(newTask);
+    toast({ title: "Task Added", description: "Your new task has been added."})
     resetForm();
   }
   
@@ -156,30 +156,6 @@ export function TaskManager() {
     const newSubtasks = subtasks.filter((_, i) => i !== index);
     setSubtasks(newSubtasks);
   };
-
-  const toggleTaskCompletion = (id: string, isCompleted: boolean) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, isCompleted } : task
-    ));
-  };
-
-  const toggleSubtaskCompletion = (taskId: string, subtaskId: string, isCompleted: boolean) => {
-    setTasks(tasks.map(t => {
-      if (t.id === taskId) {
-        const updatedSubtasks = t.subtasks.map(st => 
-            st.id === subtaskId ? { ...st, isCompleted } : st
-        );
-        const allSubtasksCompleted = updatedSubtasks.every(st => st.isCompleted);
-        return { ...t, subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted };
-      }
-      return t;
-    }));
-  };
-  
-  const deleteTask = (id: string) => {
-      setTasks(tasks.filter(task => task.id !== id));
-      toast({ title: "Task Deleted" });
-  }
 
   const filteredTasks = (status: Task['status']) => tasks.filter(task => {
      if (status === 'Today') {
@@ -285,7 +261,7 @@ export function TaskManager() {
             </div>
             <DialogFooter>
               <DialogClose asChild><Button variant="ghost" onClick={resetForm}>Cancel</Button></DialogClose>
-              <Button onClick={addTask}>Create Task</Button>
+              <Button onClick={handleAddTask}>Create Task</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -300,19 +276,19 @@ export function TaskManager() {
         </TabsList>
         <div className="mt-4 flex-1 space-y-4">
           <TabsContent value="today" className="space-y-4 m-0">
-            {filteredTasks('Today').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
+            {filteredTasks('Today').map(task => <TaskItem key={task.id} task={task} />)}
             {filteredTasks('Today').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for today. Great job!</p>}
           </TabsContent>
           <TabsContent value="upcoming" className="space-y-4 m-0">
-            {filteredTasks('Upcoming').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
+            {filteredTasks('Upcoming').map(task => <TaskItem key={task.id} task={task} />)}
             {filteredTasks('Upcoming').length === 0 && <p className="text-center text-muted-foreground pt-10">No upcoming tasks.</p>}
           </TabsContent>
           <TabsContent value="someday" className="space-y-4 m-0">
-            {filteredTasks('Someday').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
+            {filteredTasks('Someday').map(task => <TaskItem key={task.id} task={task} />)}
             {filteredTasks('Someday').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for someday.</p>}
           </TabsContent>
           <TabsContent value="completed" className="space-y-4 m-0">
-            {filteredTasks('Completed').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
+            {filteredTasks('Completed').map(task => <TaskItem key={task.id} task={task} />)}
             {filteredTasks('Completed').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks completed yet.</p>}
           </TabsContent>
         </div>

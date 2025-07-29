@@ -6,17 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { JournalEntry } from '@/types';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useAppContext } from '@/context/AppContext';
 
 export function Journal() {
-  const [journalEntry, setJournalEntry] = React.useState('');
-  const [savedEntries, setSavedEntries] = React.useState<JournalEntry[]>([]);
+  const { journalEntries, addJournalEntry } = useAppContext();
+  const [newEntryContent, setNewEntryContent] = React.useState('');
   const { toast } = useToast();
 
   const handleSaveJournal = async () => {
-    if (!journalEntry.trim()) {
+    if (!newEntryContent.trim()) {
        toast({
         title: 'Empty Entry',
         description: 'You cannot save an empty journal entry.',
@@ -25,25 +25,19 @@ export function Journal() {
       return;
     }
 
-    const newEntry: JournalEntry = {
-      id: crypto.randomUUID(),
-      content: journalEntry,
-      createdAt: new Date().toISOString(),
-    };
-    
-    setSavedEntries([newEntry, ...savedEntries]);
+    addJournalEntry(newEntryContent);
     toast({
       title: 'Journal Saved',
-      description: 'Your entry has been successfully saved locally.',
+      description: 'Your entry has been successfully saved.',
     });
-    setJournalEntry(''); // Clear textarea after saving
+    setNewEntryContent(''); // Clear textarea after saving
   };
 
   return (
     <Tabs defaultValue="new_entry" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="new_entry">New Entry</TabsTrigger>
-        <TabsTrigger value="saved_entries">Saved Entries</TabsTrigger>
+        <TabsTrigger value="saved_entries">Saved Entries ({journalEntries.length})</TabsTrigger>
       </TabsList>
       <TabsContent value="new_entry">
         <Card>
@@ -55,10 +49,10 @@ export function Journal() {
             <Textarea
               placeholder="Start writing..."
               className="min-h-[400px] text-base"
-              value={journalEntry}
-              onChange={(e) => setJournalEntry(e.target.value)}
+              value={newEntryContent}
+              onChange={(e) => setNewEntryContent(e.target.value)}
             />
-            <Button onClick={handleSaveJournal} disabled={!journalEntry.trim()} className="w-full">
+            <Button onClick={handleSaveJournal} disabled={!newEntryContent.trim()} className="w-full">
               <Save className="mr-2 h-4 w-4" />
               Save Entry
             </Button>
@@ -67,8 +61,8 @@ export function Journal() {
       </TabsContent>
       <TabsContent value="saved_entries">
         <div className="space-y-6">
-          {savedEntries.length > 0 ? (
-            savedEntries.map(entry => (
+          {journalEntries.length > 0 ? (
+            journalEntries.map(entry => (
               <Card key={entry.id}>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2"><BookOpen className="size-5 text-primary" /> Journal Entry</CardTitle>

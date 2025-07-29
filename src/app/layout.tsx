@@ -3,6 +3,7 @@ import './globals.css';
 import { AppLayout } from '@/components/AppLayout';
 import { Toaster } from '@/components/ui/toaster';
 import { Squares } from '@/components/ui/squares-background';
+import { AppProvider } from '@/context/AppContext';
 
 export const metadata: Metadata = {
   title: 'Mindful Me',
@@ -23,9 +24,11 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased bg-black">
         <Squares className="fixed inset-0 -z-10" />
-        <AppLayout>
-          {children}
-        </AppLayout>
+        <AppProvider>
+          <AppLayout>
+            {children}
+          </AppLayout>
+        </AppProvider>
         <Toaster />
       </body>
     </html>
