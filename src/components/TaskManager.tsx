@@ -252,7 +252,7 @@ export function TaskManager() {
   });
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col mt-8">
       <Tabs defaultValue="today" className="flex flex-1 flex-col">
         <div className="flex items-center justify-between">
           <TabsList>
