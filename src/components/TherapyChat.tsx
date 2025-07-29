@@ -36,12 +36,13 @@ export function TherapyChat() {
     if (!input.trim()) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInput('');
     setIsLoading(true);
 
     try {
-      const chatHistory = messages.slice(-5); // Last 5 messages for context
+      const chatHistory = newMessages.slice(-6, -1); // Last 5 messages for context, excluding the current one
       const chatInput: TherapyChatInput = { message: input, chatHistory: chatHistory.map(m => ({role: m.role, content: m.content})) };
       const result = await therapyChat(chatInput);
       const assistantMessage: Message = { role: 'assistant', content: result.response };
