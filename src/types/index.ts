@@ -11,9 +11,8 @@ export type Task = {
 export type Habit = {
   id: string;
   name: string;
-  frequency: 'daily' | 'weekly';
   streak: number;
-  completions: Record<string, boolean>; // e.g., { '2023-10-27': true }
+  completions: Record<string, boolean>; // e.g., { '2024-10-27': true }
 };
 
 export type JournalEntry = {

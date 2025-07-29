@@ -5,7 +5,7 @@ import { PlusCircle, Flame, MoreVertical, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { getDay, startOfWeek, addDays, format } from 'date-fns';
+import { getDay, startOfWeek, addDays, format, isToday, isSameDay, subDays } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -19,41 +19,112 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Habit } from '@/types';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
-const DayIndicator = ({ active }: { active: boolean }) => (
-  <div className={`size-5 rounded-full ${active ? 'bg-primary' : 'bg-muted/50'}`} />
-);
+const DayIndicator = ({ date, isCompleted, onToggle, isToday }: { date: Date, isCompleted: boolean, onToggle: () => void, isToday: boolean }) => {
+    const dayOfMonth = format(date, 'd');
+    const dayOfWeek = format(date, 'E');
 
-const HabitCalendar = () => {
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={onToggle}>
+                        <span className="text-xs text-muted-foreground">{dayOfWeek}</span>
+                        <div
+                            className={`size-8 flex items-center justify-center rounded-full transition-all 
+                            ${isCompleted ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}
+                            ${isToday ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
+                        >
+                            {dayOfMonth}
+                        </div>
+                    </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>{format(date, 'MMMM d, yyyy')}</p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
+};
+
+const HabitCalendar = ({ habit, onToggle }: { habit: Habit, onToggle: (date: Date) => void }) => {
     const weekStartsOn = 1; // Monday
     const today = new Date();
     const weekStart = startOfWeek(today, { weekStartsOn });
     const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
-  
+
     return (
-      <div className="flex justify-between">
-        {days.map((day, i) => (
-          <div key={i} className="flex flex-col items-center gap-2">
-            <span className="text-xs text-muted-foreground">{format(day, 'E')}</span>
-            <DayIndicator active={Math.random() > 0.5} />
-          </div>
-        ))}
-      </div>
+        <div className="flex justify-between">
+            {days.map((day) => {
+                const dateKey = format(day, 'yyyy-MM-dd');
+                return (
+                    <DayIndicator
+                        key={dateKey}
+                        date={day}
+                        isCompleted={!!habit.completions[dateKey]}
+                        isToday={isSameDay(day, today)}
+                        onToggle={() => onToggle(day)}
+                    />
+                );
+            })}
+        </div>
     );
-  };
-  
+};
+
 
 export function HabitTracker() {
-  const [habits, setHabits] = React.useState<Omit<Habit, 'frequency' | 'completions'>[]>([]);
+  const [habits, setHabits] = React.useState<Habit[]>([]);
   const [newHabitName, setNewHabitName] = React.useState('');
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
+  React.useEffect(() => {
+    try {
+      const storedHabits = localStorage.getItem('mindful-me-habits');
+      if (storedHabits) {
+        setHabits(JSON.parse(storedHabits));
+      }
+    } catch (error) {
+      console.error("Failed to load habits from localStorage", error);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('mindful-me-habits', JSON.stringify(habits));
+    } catch (error) {
+      console.error("Failed to save habits to localStorage", error);
+    }
+  }, [habits]);
+
+  const calculateStreak = (completions: Record<string, boolean>): number => {
+    let streak = 0;
+    let currentDate = new Date();
+    
+    // If today's habit is not completed, start checking from yesterday
+    if (!completions[format(currentDate, 'yyyy-MM-dd')]) {
+        currentDate = subDays(currentDate, 1);
+    }
+  
+    while (true) {
+      const dateKey = format(currentDate, 'yyyy-MM-dd');
+      if (completions[dateKey]) {
+        streak++;
+        currentDate = subDays(currentDate, 1);
+      } else {
+        break;
+      }
+    }
+    return streak;
+  };
+
   const addHabit = () => {
     if (!newHabitName.trim()) return;
-    const newHabit = {
+    const newHabit: Habit = {
       id: crypto.randomUUID(),
       name: newHabitName,
       streak: 0,
+      completions: {},
     };
     setHabits([...habits, newHabit]);
     setNewHabitName('');
@@ -63,7 +134,23 @@ export function HabitTracker() {
   const deleteHabit = (id: string) => {
     setHabits(habits.filter(habit => habit.id !== id));
   };
+  
+  const toggleHabitCompletion = (habitId: string, date: Date) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    setHabits(habits.map(h => {
+      if (h.id === habitId) {
+        const newCompletions = { ...h.completions, [dateKey]: !h.completions[dateKey] };
+        const newStreak = calculateStreak(newCompletions);
+        return { ...h, completions: newCompletions, streak: newStreak };
+      }
+      return h;
+    }));
+  };
 
+  const isHabitCompletedToday = (habit: Habit) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    return !!habit.completions[todayKey];
+  }
 
   return (
     <div className="space-y-6">
@@ -90,6 +177,7 @@ export function HabitTracker() {
                   onChange={(e) => setNewHabitName(e.target.value)}
                   placeholder="e.g. Meditate for 10 minutes"
                   className="col-span-3"
+                  onKeyDown={(e) => { if (e.key === 'Enter') addHabit() }}
                 />
               </div>
             </div>
@@ -116,7 +204,7 @@ export function HabitTracker() {
                       </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Checkbox className="size-6" />
+                    <Checkbox className="size-6" checked={isHabitCompletedToday(habit)} onCheckedChange={() => toggleHabitCompletion(habit.id, new Date())} />
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="size-8">
@@ -133,7 +221,7 @@ export function HabitTracker() {
                 </div>
               </CardHeader>
               <CardContent>
-                  <HabitCalendar />
+                  <HabitCalendar habit={habit} onToggle={(date) => toggleHabitCompletion(habit.id, date)} />
               </CardContent>
             </Card>
           ))}
