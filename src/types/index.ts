@@ -14,6 +14,7 @@ export type Task = {
   isCompleted: boolean;
   subtasks: Subtask[];
   reminder?: number; // minutes
+  created_at?: string;
 };
 
 export type Habit = {
@@ -21,6 +22,7 @@ export type Habit = {
   name: string;
   streak: number;
   completions: Record<string, boolean>; // e.g., { '2024-10-27': true }
+  created_at?: string;
 };
 
 export type JournalEntry = {

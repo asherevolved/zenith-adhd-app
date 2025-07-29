@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { PlusCircle, MoreVertical, Trash2, Bell, X, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, MoreVertical, Trash2, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,6 +24,7 @@ import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { getTasks, addTask asaddTaskToSupabase, updateTask, deleteTask as deleteTaskFromSupabase } from '@/lib/supabaseClient';
 
 const priorityColors = {
   Urgent: 'border-red-500/50 text-red-400',
@@ -31,7 +32,7 @@ const priorityColors = {
   Low: 'border-green-500/50 text-green-400',
 };
 
-function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, onToggle: (id: string) => void, onDelete: (id: string) => void, onSubtaskToggle: (taskId: string, subtaskId: string) => void }) {
+function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, onToggle: (id: string, isCompleted: boolean) => void, onDelete: (id: string) => void, onSubtaskToggle: (taskId: string, subtaskId: string, isCompleted: boolean) => void }) {
   const completedSubtasks = task.subtasks.filter(st => st.isCompleted).length;
   const progress = task.subtasks.length > 0 ? (completedSubtasks / task.subtasks.length) * 100 : (task.isCompleted ? 100 : 0);
 
@@ -39,7 +40,7 @@ function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, o
     <div className="bg-transparent transition-all p-4 rounded-lg">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 flex-1">
-          <Checkbox checked={task.isCompleted} onCheckedChange={() => onToggle(task.id)} className="size-5" />
+          <Checkbox checked={task.isCompleted} onCheckedChange={(checked) => onToggle(task.id, !!checked)} className="size-5" />
           <div className={`text-base font-medium ${task.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
             {task.title}
           </div>
@@ -53,7 +54,7 @@ function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, o
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => onToggle(task.id)}>
+              <DropdownMenuItem onClick={() => onToggle(task.id, !task.isCompleted)}>
                 {task.isCompleted ? 'Mark as Not Done' : 'Mark as Done'}
               </DropdownMenuItem>
               <DropdownMenuItem className="text-red-400" onClick={() => onDelete(task.id)}>
@@ -74,7 +75,7 @@ function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, o
                 <Checkbox
                   id={`subtask-${subtask.id}`}
                   checked={subtask.isCompleted}
-                  onCheckedChange={() => onSubtaskToggle(task.id, subtask.id)}
+                  onCheckedChange={(checked) => onSubtaskToggle(task.id, subtask.id, !!checked)}
                   className="size-4"
                 />
                 <Label htmlFor={`subtask-${subtask.id}`} className={`text-sm ${subtask.isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
@@ -96,6 +97,7 @@ function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, o
 export function TaskManager() {
   const { toast } = useToast();
   const [tasks, setTasks] = React.useState<Task[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   
   const [newTaskTitle, setNewTaskTitle] = React.useState('');
@@ -106,23 +108,22 @@ export function TaskManager() {
   const [newReminder, setNewReminder] = React.useState('');
 
   React.useEffect(() => {
-    try {
-      const storedTasks = localStorage.getItem('mindful-me-tasks');
-      if (storedTasks) {
-        setTasks(JSON.parse(storedTasks));
-      }
-    } catch (error) {
-      console.error("Failed to load tasks from localStorage", error);
-    }
+    fetchTasks();
   }, []);
-
-  React.useEffect(() => {
+  
+  const fetchTasks = async () => {
     try {
-      localStorage.setItem('mindful-me-tasks', JSON.stringify(tasks));
+      setIsLoading(true);
+      const tasksFromSupabase = await getTasks();
+      setTasks(tasksFromSupabase);
     } catch (error) {
-      console.error("Failed to save tasks to localStorage", error);
+      console.error("Failed to load tasks from Supabase", error);
+      toast({ variant: 'destructive', title: 'Error fetching tasks.' });
+    } finally {
+      setIsLoading(false);
     }
-  }, [tasks]);
+  };
+
 
   const requestNotificationPermission = async () => {
     if (!('Notification' in window)) {
@@ -179,8 +180,7 @@ export function TaskManager() {
             isCompleted: false
         }));
 
-    const newTask: Task = {
-      id: crypto.randomUUID(),
+    const newTaskData = {
       title: newTaskTitle,
       notes: newTaskNotes,
       dueDate: format(new Date(), 'yyyy-MM-dd'),
@@ -191,11 +191,17 @@ export function TaskManager() {
       reminder: reminderMinutes > 0 ? reminderMinutes : undefined,
     };
 
-    setTasks([newTask, ...tasks]);
-    if (newTask.reminder) {
-        scheduleNotification(newTask);
+    try {
+        const newTask = await addTaskToSupabase(newTaskData);
+        setTasks([newTask, ...tasks]);
+        if (newTask.reminder) {
+            scheduleNotification(newTask);
+        }
+        resetForm();
+    } catch(error) {
+        console.error("Failed to add task", error);
+        toast({ variant: 'destructive', title: 'Failed to add task.' });
     }
-    resetForm();
   }
   
   const handleSubtaskChange = (index: number, value: string) => {
@@ -213,27 +219,44 @@ export function TaskManager() {
     setSubtasks(newSubtasks);
   };
 
-  const toggleTaskCompletion = (id: string) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, isCompleted: !task.isCompleted } : task
-    ));
+  const toggleTaskCompletion = async (id: string, isCompleted: boolean) => {
+    try {
+        await updateTask(id, { isCompleted });
+        setTasks(tasks.map(task => 
+          task.id === id ? { ...task, isCompleted } : task
+        ));
+    } catch(error) {
+        console.error("Failed to update task", error);
+        toast({ variant: 'destructive', title: 'Failed to update task.' });
+    }
   };
 
-  const toggleSubtaskCompletion = (taskId: string, subtaskId: string) => {
-    setTasks(tasks.map(task => {
-        if (task.id === taskId) {
-            const updatedSubtasks = task.subtasks.map(st => 
-                st.id === subtaskId ? { ...st, isCompleted: !st.isCompleted } : st
-            );
-            const allSubtasksCompleted = updatedSubtasks.every(st => st.isCompleted);
-            return { ...task, subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted };
-        }
-        return task;
-    }));
+  const toggleSubtaskCompletion = async (taskId: string, subtaskId: string, isCompleted: boolean) => {
+    const taskToUpdate = tasks.find(t => t.id === taskId);
+    if (!taskToUpdate) return;
+    
+    const updatedSubtasks = taskToUpdate.subtasks.map(st => 
+        st.id === subtaskId ? { ...st, isCompleted } : st
+    );
+    const allSubtasksCompleted = updatedSubtasks.every(st => st.isCompleted);
+    
+    try {
+        await updateTask(taskId, { subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted });
+        setTasks(tasks.map(t => t.id === taskId ? { ...t, subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted } : t));
+    } catch(error) {
+        console.error("Failed to update subtask", error);
+        toast({ variant: 'destructive', title: 'Failed to update subtask.' });
+    }
   };
   
-  const deleteTask = (id: string) => {
-    setTasks(tasks.filter(task => task.id !== id));
+  const deleteTask = async (id: string) => {
+      try {
+        await deleteTaskFromSupabase(id);
+        setTasks(tasks.filter(task => task.id !== id));
+      } catch(error) {
+        console.error("Failed to delete task", error);
+        toast({ variant: 'destructive', title: 'Failed to delete task.' });
+      }
   }
 
   const filteredTasks = (status: Task['status']) => tasks.filter(task => {
@@ -246,6 +269,10 @@ export function TaskManager() {
      }
      return !task.isCompleted && task.status === status;
   });
+  
+  if (isLoading) {
+    return <div className="text-center text-muted-foreground pt-10">Loading tasks...</div>
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -253,7 +280,7 @@ export function TaskManager() {
         <h1 className="text-2xl font-semibold text-white">Task Manager</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-transparent text-white border border-white hover:bg-white hover:text-black">
+            <Button>
               <PlusCircle className="mr-2 size-4" /> Add Task
             </Button>
           </DialogTrigger>

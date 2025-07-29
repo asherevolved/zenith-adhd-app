@@ -21,6 +21,10 @@ import type { Task, Habit } from '@/types';
 import { CheckCircle2, Flame, Sparkles, Target, Trophy } from 'lucide-react';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
+import { getTasks } from '@/lib/supabaseClient';
+import { getHabits } from '@/lib/supabaseClient';
+import { useToast } from '@/hooks/use-toast';
+
 
 const chartConfig = {
   tasks: { label: 'Tasks', color: 'hsl(var(--chart-2))' },
@@ -35,58 +39,67 @@ export function Dashboard() {
   const [habits, setHabits] = React.useState<Habit[]>([]);
   const [weeklyActivity, setWeeklyActivity] = React.useState<{ day: string; tasks: number; habits: number; }[]>([]);
   const [dailyProgress, setDailyProgress] = React.useState<{ date: string, progress: number }[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const { toast } = useToast();
+
 
   React.useEffect(() => {
-    // This code runs only on the client
-    const loadData = () => {
-      // Load Tasks
-      const storedTasks = localStorage.getItem('mindful-me-tasks');
-      const loadedTasks: Task[] = storedTasks ? JSON.parse(storedTasks) : [];
-      setTasks(loadedTasks);
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        // Load Tasks and Habits from Supabase
+        const [loadedTasks, loadedHabits] = await Promise.all([getTasks(), getHabits()]);
+        setTasks(loadedTasks);
+        setHabits(loadedHabits);
 
-      // Load Habits
-      const storedHabits = localStorage.getItem('mindful-me-habits');
-      const loadedHabits: Habit[] = storedHabits ? JSON.parse(storedHabits) : [];
-      setHabits(loadedHabits);
+        // Process Weekly Activity
+        const weekStartsOn = 1; // Monday
+        const weekStart = startOfWeek(new Date(), { weekStartsOn });
+        const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
+        
+        const activity = days.map(day => {
+          const dateKey = format(day, 'yyyy-MM-dd');
+          const tasksCompletedOnDay = loadedTasks.filter(t => t.isCompleted && t.dueDate === dateKey).length;
+          const habitsCompletedOnDay = loadedHabits.filter(h => h.completions[dateKey]).length;
+          return {
+            day: format(day, 'E'),
+            tasks: tasksCompletedOnDay,
+            habits: habitsCompletedOnDay
+          };
+        });
+        setWeeklyActivity(activity);
 
-      // Process Weekly Activity
-      const weekStartsOn = 1; // Monday
-      const weekStart = startOfWeek(new Date(), { weekStartsOn });
-      const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
-      
-      const activity = days.map(day => {
-        const dateKey = format(day, 'yyyy-MM-dd');
-        const tasksCompletedOnDay = loadedTasks.filter(t => t.isCompleted && t.dueDate === dateKey).length;
-        const habitsCompletedOnDay = loadedHabits.filter(h => h.completions[dateKey]).length;
-        return {
-          day: format(day, 'E'),
-          tasks: tasksCompletedOnDay,
-          habits: habitsCompletedOnDay
-        };
-      });
-      setWeeklyActivity(activity);
-
-      // Process Daily Progress for the last 7 days
-      const last7Days = Array.from({ length: 7 }).map((_, i) => subDays(new Date(), i)).reverse();
-      const progressData = last7Days.map(day => {
-        const dateKey = format(day, 'yyyy-MM-dd');
-        const totalTasks = loadedTasks.filter(t => t.dueDate === dateKey).length;
-        const completedTasks = loadedTasks.filter(t => t.isCompleted && t.dueDate === dateKey).length;
-        const totalHabits = loadedHabits.length;
-        const completedHabits = loadedHabits.filter(h => h.completions[dateKey]).length;
-        const dailyCompletion = (totalTasks + totalHabits) > 0 ? ((completedTasks + completedHabits) / (totalTasks + totalHabits)) * 100 : 0;
-        return {
-          date: format(day, 'MMM d'),
-          progress: Math.round(dailyCompletion),
-        };
-      });
-      setDailyProgress(progressData);
+        // Process Daily Progress for the last 7 days
+        const last7Days = Array.from({ length: 7 }).map((_, i) => subDays(new Date(), i)).reverse();
+        const progressData = last7Days.map(day => {
+          const dateKey = format(day, 'yyyy-MM-dd');
+          const totalTasks = loadedTasks.filter(t => t.dueDate === dateKey).length;
+          const completedTasks = loadedTasks.filter(t => t.isCompleted && t.dueDate === dateKey).length;
+          const totalHabits = loadedHabits.length;
+          const completedHabits = loadedHabits.filter(h => h.completions[dateKey]).length;
+          const dailyCompletion = (totalTasks + totalHabits) > 0 ? ((completedTasks + completedHabits) / (totalTasks + totalHabits)) * 100 : 0;
+          return {
+            date: format(day, 'MMM d'),
+            progress: Math.round(dailyCompletion),
+          };
+        });
+        setDailyProgress(progressData);
+      } catch (error) {
+        console.error("Failed to load dashboard data", error);
+        toast({ variant: 'destructive', title: 'Error fetching dashboard data.' });
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadData();
-    window.addEventListener('storage', loadData);
-    return () => window.removeEventListener('storage', loadData);
-  }, []);
+    // You might want a better way to trigger re-fetches, e.g., a refresh button 
+    // or listening to custom events when data changes in other components.
+  }, [toast]);
+
+  if (isLoading) {
+    return <div className="text-center text-muted-foreground pt-10">Loading dashboard...</div>
+  }
 
   const completedTasks = tasks.filter(t => t.isCompleted).length;
   const pendingTasks = tasks.length - completedTasks;

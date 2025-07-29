@@ -5,7 +5,7 @@ import { PlusCircle, Flame, MoreVertical, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { getDay, startOfWeek, addDays, format, isToday, isSameDay, subDays } from 'date-fns';
+import { startOfWeek, addDays, format, isSameDay, subDays } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -20,8 +20,11 @@ import { Label } from '@/components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Habit } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
+import { getHabits, addHabit as addHabitToSupabase, updateHabit, deleteHabit as deleteHabitFromSupabase } from '@/lib/supabaseClient';
 
-const DayIndicator = ({ date, isCompleted, onToggle, isToday }: { date: Date, isCompleted: boolean, onToggle: () => void, isToday: boolean }) => {
+
+const DayIndicator = ({ date, isCompleted, onToggle, isTodayFlag }: { date: Date, isCompleted: boolean, onToggle: () => void, isTodayFlag: boolean }) => {
     const dayOfMonth = format(date, 'd');
     const dayOfWeek = format(date, 'E');
 
@@ -34,7 +37,7 @@ const DayIndicator = ({ date, isCompleted, onToggle, isToday }: { date: Date, is
                         <div
                             className={`size-8 flex items-center justify-center rounded-full transition-all 
                             ${isCompleted ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}
-                            ${isToday ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
+                            ${isTodayFlag ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
                         >
                             {dayOfMonth}
                         </div>
@@ -63,7 +66,7 @@ const HabitCalendar = ({ habit, onToggle }: { habit: Habit, onToggle: (date: Dat
                         key={dateKey}
                         date={day}
                         isCompleted={!!habit.completions[dateKey]}
-                        isToday={isSameDay(day, today)}
+                        isTodayFlag={isSameDay(day, today)}
                         onToggle={() => onToggle(day)}
                     />
                 );
@@ -75,27 +78,28 @@ const HabitCalendar = ({ habit, onToggle }: { habit: Habit, onToggle: (date: Dat
 
 export function HabitTracker() {
   const [habits, setHabits] = React.useState<Habit[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [newHabitName, setNewHabitName] = React.useState('');
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const { toast } = useToast();
 
   React.useEffect(() => {
-    try {
-      const storedHabits = localStorage.getItem('mindful-me-habits');
-      if (storedHabits) {
-        setHabits(JSON.parse(storedHabits));
-      }
-    } catch (error) {
-      console.error("Failed to load habits from localStorage", error);
-    }
+    fetchHabits();
   }, []);
 
-  React.useEffect(() => {
+  const fetchHabits = async () => {
     try {
-      localStorage.setItem('mindful-me-habits', JSON.stringify(habits));
+      setIsLoading(true);
+      const habitsFromSupabase = await getHabits();
+      setHabits(habitsFromSupabase);
     } catch (error) {
-      console.error("Failed to save habits to localStorage", error);
+      console.error("Failed to load habits from Supabase", error);
+      toast({ variant: 'destructive', title: 'Error fetching habits.' });
+    } finally {
+      setIsLoading(false);
     }
-  }, [habits]);
+  };
+
 
   const calculateStreak = (completions: Record<string, boolean>): number => {
     let streak = 0;
@@ -118,38 +122,58 @@ export function HabitTracker() {
     return streak;
   };
 
-  const addHabit = () => {
+  const addHabit = async () => {
     if (!newHabitName.trim()) return;
-    const newHabit: Habit = {
-      id: crypto.randomUUID(),
+    const newHabitData = {
       name: newHabitName,
       streak: 0,
       completions: {},
     };
-    setHabits([...habits, newHabit]);
-    setNewHabitName('');
-    setIsDialogOpen(false);
+    try {
+        const newHabit = await addHabitToSupabase(newHabitData);
+        setHabits([...habits, newHabit]);
+        setNewHabitName('');
+        setIsDialogOpen(false);
+    } catch (error) {
+        console.error("Failed to add habit", error);
+        toast({ variant: 'destructive', title: 'Failed to add habit.' });
+    }
   };
 
-  const deleteHabit = (id: string) => {
-    setHabits(habits.filter(habit => habit.id !== id));
+  const deleteHabit = async (id: string) => {
+    try {
+        await deleteHabitFromSupabase(id);
+        setHabits(habits.filter(habit => habit.id !== id));
+    } catch (error) {
+        console.error("Failed to delete habit", error);
+        toast({ variant: 'destructive', title: 'Failed to delete habit.' });
+    }
   };
   
-  const toggleHabitCompletion = (habitId: string, date: Date) => {
+  const toggleHabitCompletion = async (habitId: string, date: Date) => {
+    const habitToUpdate = habits.find(h => h.id === habitId);
+    if (!habitToUpdate) return;
+    
     const dateKey = format(date, 'yyyy-MM-dd');
-    setHabits(habits.map(h => {
-      if (h.id === habitId) {
-        const newCompletions = { ...h.completions, [dateKey]: !h.completions[dateKey] };
-        const newStreak = calculateStreak(newCompletions);
-        return { ...h, completions: newCompletions, streak: newStreak };
-      }
-      return h;
-    }));
+    const newCompletions = { ...habitToUpdate.completions, [dateKey]: !habitToUpdate.completions[dateKey] };
+    const newStreak = calculateStreak(newCompletions);
+    
+    try {
+        await updateHabit(habitId, { completions: newCompletions, streak: newStreak });
+        setHabits(habits.map(h => h.id === habitId ? { ...h, completions: newCompletions, streak: newStreak } : h));
+    } catch (error) {
+        console.error("Failed to update habit", error);
+        toast({ variant: 'destructive', title: 'Failed to update habit.' });
+    }
   };
 
   const isHabitCompletedToday = (habit: Habit) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     return !!habit.completions[todayKey];
+  }
+  
+  if (isLoading) {
+    return <div className="text-center text-muted-foreground pt-10">Loading habits...</div>
   }
 
   return (
