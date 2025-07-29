@@ -1,3 +1,9 @@
+export type Subtask = {
+  id: string;
+  title: string;
+  isCompleted: boolean;
+};
+
 export type Task = {
   id: string;
   title: string;
@@ -6,6 +12,8 @@ export type Task = {
   priority: 'Urgent' | 'Medium' | 'Low';
   status: 'Today' | 'Upcoming' | 'Someday';
   isCompleted: boolean;
+  subtasks: Subtask[];
+  reminder?: number; // minutes
 };
 
 export type Habit = {

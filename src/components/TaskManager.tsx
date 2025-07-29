@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { PlusCircle, MoreVertical, Trash2 } from 'lucide-react';
+import { PlusCircle, MoreVertical, Trash2, Bell, X, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,10 +19,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import type { Task } from '@/types';
+import type { Task, Subtask } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
+import { Progress } from './ui/progress';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 const priorityColors = {
   Urgent: 'bg-red-500/20 text-red-400 border-red-500/30',
@@ -30,45 +32,73 @@ const priorityColors = {
   Low: 'bg-green-500/20 text-green-400 border-green-500/30',
 };
 
-function TaskCard({ task, onToggle, onDelete }: { task: Task, onToggle: (id: string) => void, onDelete: (id: string) => void }) {
+function TaskCard({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, onToggle: (id: string) => void, onDelete: (id: string) => void, onSubtaskToggle: (taskId: string, subtaskId: string) => void }) {
+  const completedSubtasks = task.subtasks.filter(st => st.isCompleted).length;
+  const progress = task.subtasks.length > 0 ? (completedSubtasks / task.subtasks.length) * 100 : (task.isCompleted ? 100 : 0);
+
   return (
     <Card className="bg-card/80 backdrop-blur-sm transition-all hover:bg-card">
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-        <div className="flex items-center gap-3">
-            <Checkbox checked={task.isCompleted} onCheckedChange={() => onToggle(task.id)} className="size-5" />
-            <CardTitle className={`text-base font-medium ${task.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
-              {task.title}
-            </CardTitle>
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1">
+                <Checkbox checked={task.isCompleted} onCheckedChange={() => onToggle(task.id)} className="size-5" />
+                <CardTitle className={`text-base font-medium ${task.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
+                  {task.title}
+                </CardTitle>
+            </div>
+            <div className="flex items-center gap-1">
+                 <Badge variant="outline" className={priorityColors[task.priority]}>{task.priority}</Badge>
+                 <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-8 shrink-0">
+                      <MoreVertical className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => onToggle(task.id)}>
+                      {task.isCompleted ? 'Mark as Not Done' : 'Mark as Done'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-red-400" onClick={() => onDelete(task.id)}>
+                        <Trash2 className="mr-2 size-4" />
+                        Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8 shrink-0">
-              <MoreVertical className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {/* <DropdownMenuItem>Edit</DropdownMenuItem> */}
-            <DropdownMenuItem onClick={() => onToggle(task.id)}>
-              {task.isCompleted ? 'Mark as Not Done' : 'Mark as Done'}
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-400" onClick={() => onDelete(task.id)}>
-                <Trash2 className="mr-2 size-4" />
-                Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <p className="text-xs text-muted-foreground pt-1 pl-8">Due: {task.dueDate}</p>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center space-x-4 text-sm text-muted-foreground pl-8">
-          <span>Due: {task.dueDate}</span>
-          <Badge variant="outline" className={priorityColors[task.priority]}>{task.priority}</Badge>
-        </div>
+        {task.subtasks.length > 0 && (
+          <div className="pl-8 mt-2 space-y-3">
+            <div className="space-y-2">
+                {task.subtasks.map(subtask => (
+                    <div key={subtask.id} className="flex items-center gap-3">
+                        <Checkbox 
+                            id={`subtask-${subtask.id}`} 
+                            checked={subtask.isCompleted}
+                            onCheckedChange={() => onSubtaskToggle(task.id, subtask.id)}
+                            className="size-4"
+                        />
+                        <Label htmlFor={`subtask-${subtask.id}`} className={`text-sm ${subtask.isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                            {subtask.title}
+                        </Label>
+                    </div>
+                ))}
+            </div>
+            <div className="flex items-center gap-2">
+                <Progress value={progress} className="h-2" />
+                <span className="text-xs text-muted-foreground">{Math.round(progress)}%</span>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
 export function TaskManager() {
+  const { toast } = useToast();
   const [tasks, setTasks] = React.useState<Task[]>([]);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   
@@ -76,6 +106,8 @@ export function TaskManager() {
   const [newTaskNotes, setNewTaskNotes] = React.useState('');
   const [newTaskPriority, setNewTaskPriority] = React.useState<Task['priority']>('Medium');
   const [newTaskStatus, setNewTaskStatus] = React.useState<Task['status']>('Today');
+  const [subtasks, setSubtasks] = React.useState<Partial<Subtask>[]>([{ title: '' }]);
+  const [newReminder, setNewReminder] = React.useState<string>("0");
 
   React.useEffect(() => {
     try {
@@ -96,8 +128,61 @@ export function TaskManager() {
     }
   }, [tasks]);
 
-  const addTask = () => {
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      toast({ variant: 'destructive', title: 'This browser does not support desktop notification' });
+      return false;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      toast({ variant: 'destructive', title: 'Notification permission denied!' });
+      return false;
+    }
+    return true;
+  };
+
+  const scheduleNotification = (task: Task) => {
+    if (!task.reminder || task.reminder === 0) return;
+
+    const reminderTime = new Date(new Date().getTime() + task.reminder * 60000);
+    
+    setTimeout(() => {
+        new Notification('Mindful Me Reminder', {
+            body: `It's time for your task: ${task.title}`,
+            icon: '/logo.svg'
+        });
+    }, reminderTime.getTime() - new Date().getTime());
+
+    toast({ title: "Reminder set!", description: `You will be notified for "${task.title}" in ${task.reminder} minutes.` });
+  };
+  
+  const resetForm = () => {
+    setNewTaskTitle('');
+    setNewTaskNotes('');
+    setNewTaskPriority('Medium');
+    setNewTaskStatus('Today');
+    setSubtasks([{ title: '' }]);
+    setNewReminder("0");
+    setIsDialogOpen(false);
+  }
+
+  const addTask = async () => {
     if (!newTaskTitle.trim()) return;
+
+    const reminderMinutes = parseInt(newReminder, 10);
+    if (reminderMinutes > 0) {
+        const permissionGranted = await requestNotificationPermission();
+        if (!permissionGranted) return;
+    }
+    
+    const finalSubtasks = subtasks
+        .filter(st => st.title && st.title.trim() !== '')
+        .map(st => ({
+            id: crypto.randomUUID(),
+            title: st.title!,
+            isCompleted: false
+        }));
+
     const newTask: Task = {
       id: crypto.randomUUID(),
       title: newTaskTitle,
@@ -106,19 +191,49 @@ export function TaskManager() {
       priority: newTaskPriority,
       status: newTaskStatus,
       isCompleted: false,
+      subtasks: finalSubtasks,
+      reminder: reminderMinutes > 0 ? reminderMinutes : undefined,
     };
+
     setTasks([newTask, ...tasks]);
-    setNewTaskTitle('');
-    setNewTaskNotes('');
-    setNewTaskPriority('Medium');
-    setNewTaskStatus('Today');
-    setIsDialogOpen(false);
+    if (newTask.reminder) {
+        scheduleNotification(newTask);
+    }
+    resetForm();
   }
+  
+  const handleSubtaskChange = (index: number, value: string) => {
+    const newSubtasks = [...subtasks];
+    newSubtasks[index].title = value;
+    setSubtasks(newSubtasks);
+  };
+
+  const addSubtaskInput = () => {
+    setSubtasks([...subtasks, { title: '' }]);
+  };
+
+  const removeSubtaskInput = (index: number) => {
+    const newSubtasks = subtasks.filter((_, i) => i !== index);
+    setSubtasks(newSubtasks);
+  };
 
   const toggleTaskCompletion = (id: string) => {
     setTasks(tasks.map(task => 
       task.id === id ? { ...task, isCompleted: !task.isCompleted } : task
     ));
+  };
+
+  const toggleSubtaskCompletion = (taskId: string, subtaskId: string) => {
+    setTasks(tasks.map(task => {
+        if (task.id === taskId) {
+            const updatedSubtasks = task.subtasks.map(st => 
+                st.id === subtaskId ? { ...st, isCompleted: !st.isCompleted } : st
+            );
+            const allSubtasksCompleted = updatedSubtasks.every(st => st.isCompleted);
+            return { ...task, subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted };
+        }
+        return task;
+    }));
   };
   
   const deleteTask = (id: string) => {
@@ -128,9 +243,12 @@ export function TaskManager() {
   const filteredTasks = (status: Task['status']) => tasks.filter(task => {
      if (status === 'Today') {
         const today = format(new Date(), 'yyyy-MM-dd');
-        return task.status === 'Today' || task.dueDate === today;
+        return !task.isCompleted && (task.status === 'Today' || task.dueDate === today);
      }
-     return task.status === status;
+      if (status === 'Completed') {
+         return task.isCompleted;
+     }
+     return !task.isCompleted && task.status === status;
   });
 
   return (
@@ -141,6 +259,7 @@ export function TaskManager() {
             <TabsTrigger value="today">Today</TabsTrigger>
             <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
             <TabsTrigger value="someday">Someday</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
           </TabsList>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -148,48 +267,90 @@ export function TaskManager() {
                 <PlusCircle className="mr-2 size-4" /> Add Task
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Create a new task</DialogTitle>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="title" className="text-right">Title</Label>
-                  <Input id="title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="e.g. Call therapist" className="col-span-3" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-4">
+                {/* Left Column */}
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="title">Title</Label>
+                    <Input id="title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="e.g. Call therapist" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label htmlFor="notes">Notes</Label>
+                    <Textarea id="notes" value={newTaskNotes} onChange={(e) => setNewTaskNotes(e.target.value)} placeholder="Add details..." className="mt-1" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                      <div>
+                         <Label htmlFor="priority">Priority</Label>
+                         <Select value={newTaskPriority} onValueChange={(v) => setNewTaskPriority(v as Task['priority'])}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Low">Low</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="Urgent">Urgent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="status">Status</Label>
+                        <Select value={newTaskStatus} onValueChange={(v) => setNewTaskStatus(v as Task['status'])}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Today">Today</SelectItem>
+                            <SelectItem value="Upcoming">Upcoming</SelectItem>
+                            <SelectItem value="Someday">Someday</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                  </div>
+                   <div>
+                    <Label htmlFor="reminder">Reminder</Label>
+                     <Select value={newReminder} onValueChange={setNewReminder}>
+                        <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="No reminder" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="0">No reminder</SelectItem>
+                            <SelectItem value="2">2 minutes</SelectItem>
+                            <SelectItem value="5">5 minutes</SelectItem>
+                            <SelectItem value="10">10 minutes</SelectItem>
+                        </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="notes" className="text-right">Notes</Label>
-                  <Textarea id="notes" value={newTaskNotes} onChange={(e) => setNewTaskNotes(e.target.value)} placeholder="Add details..." className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="priority" className="text-right">Priority</Label>
-                   <Select value={newTaskPriority} onValueChange={(v) => setNewTaskPriority(v as Task['priority'])}>
-                    <SelectTrigger className="col-span-3">
-                      <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Low">Low</SelectItem>
-                      <SelectItem value="Medium">Medium</SelectItem>
-                      <SelectItem value="Urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="status" className="text-right">Status</Label>
-                   <Select value={newTaskStatus} onValueChange={(v) => setNewTaskStatus(v as Task['status'])}>
-                    <SelectTrigger className="col-span-3">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Today">Today</SelectItem>
-                      <SelectItem value="Upcoming">Upcoming</SelectItem>
-                      <SelectItem value="Someday">Someday</SelectItem>
-                    </SelectContent>
-                  </Select>
+                {/* Right Column */}
+                <div className="space-y-4">
+                  <div>
+                    <Label>Subtasks</Label>
+                    <div className="mt-1 space-y-2 max-h-48 overflow-y-auto pr-2">
+                       {subtasks.map((subtask, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Input
+                            value={subtask.title}
+                            onChange={(e) => handleSubtaskChange(index, e.target.value)}
+                            placeholder={`Subtask ${index + 1}`}
+                          />
+                          <Button variant="ghost" size="icon" onClick={() => removeSubtaskInput(index)} disabled={subtasks.length === 1}>
+                            <X className="size-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <Button variant="link" size="sm" onClick={addSubtaskInput} className="mt-1 px-0">
+                      <PlusCircle className="mr-2 size-4" /> Add Subtask
+                    </Button>
+                  </div>
                 </div>
               </div>
               <DialogFooter>
-                <DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose>
+                <DialogClose asChild><Button variant="ghost" onClick={resetForm}>Cancel</Button></DialogClose>
                 <Button onClick={addTask}>Create Task</Button>
               </DialogFooter>
             </DialogContent>
@@ -197,16 +358,20 @@ export function TaskManager() {
         </div>
         <div className="mt-4 flex-1">
           <TabsContent value="today" className="space-y-4">
-            {filteredTasks('Today').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} />)}
+            {filteredTasks('Today').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
             {filteredTasks('Today').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for today. Great job!</p>}
           </TabsContent>
           <TabsContent value="upcoming" className="space-y-4">
-            {filteredTasks('Upcoming').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} />)}
+            {filteredTasks('Upcoming').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
             {filteredTasks('Upcoming').length === 0 && <p className="text-center text-muted-foreground pt-10">No upcoming tasks.</p>}
           </TabsContent>
           <TabsContent value="someday" className="space-y-4">
-            {filteredTasks('Someday').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} />)}
+            {filteredTasks('Someday').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
             {filteredTasks('Someday').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for someday.</p>}
+          </TabsContent>
+          <TabsContent value="completed" className="space-y-4">
+            {filteredTasks('Completed').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
+            {filteredTasks('Completed').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks completed yet.</p>}
           </TabsContent>
         </div>
       </Tabs>
