@@ -7,6 +7,7 @@ import {
   Book,
   CheckSquare,
   LayoutDashboard,
+  Menu,
   MessageCircle,
   Mic,
   Repeat,
@@ -66,57 +67,48 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const activeLabel = menuItems.find((item) => item.href === pathname)?.label || 'Dashboard';
 
   return (
-    <div>
+    <div className="relative min-h-screen w-full">
       <AnimeNavBar items={animeNavItems} defaultActive={activeLabel} />
-      <div className="md:pt-24">
-        {isMobile && (
-          <header className="flex h-16 items-center justify-between border-b bg-background/50 px-4 backdrop-blur-sm md:px-6">
-            <div className="flex items-center gap-4">
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" size="icon">
-                      <LayoutDashboard className="h-6 w-6" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left">
-                    <SheetHeader>
-                      <SheetTitle className="flex items-center gap-2">
-                         <MindfulMeLogo className="size-8" />
-                         <span className="text-2xl font-headline font-semibold">Mindful Me</span>
-                      </SheetTitle>
-                    </SheetHeader>
-                    <div className="grid gap-4 py-4">
-                      <nav className="grid items-start gap-2 px-4 text-sm font-medium">
-                        {menuItems.map((item) => (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${pathname === item.href ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                          >
-                            <item.icon className="h-5 w-5" />
-                            {item.label}
-                          </Link>
-                        ))}
-                      </nav>
-                    </div>
-                    <div className="absolute bottom-4 w-[calc(100%-2rem)]">
-                       <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleVoiceCommand}>
-                          <Mic />
-                          <span>Voice Assistant</span>
-                      </Button>
-                    </div>
-                  </SheetContent>
-                </Sheet>
-              <h2 className="text-xl font-headline font-medium md:text-2xl">
-                {activeLabel}
-              </h2>
+      {isMobile && (
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="fixed top-4 left-4 z-[10000]">
+              <Menu className="h-6 w-6" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                 <MindfulMeLogo className="size-8" />
+                 <span className="text-2xl font-headline font-semibold">Mindful Me</span>
+              </SheetTitle>
+            </SheetHeader>
+            <div className="grid gap-4 py-4">
+              <nav className="grid items-start gap-2 px-4 text-sm font-medium">
+                {menuItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${pathname === item.href ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
             </div>
-          </header>
-        )}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          {children}
-        </main>
-      </div>
+            <div className="absolute bottom-4 w-[calc(100%-2rem)]">
+               <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleVoiceCommand}>
+                  <Mic />
+                  <span>Voice Assistant</span>
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+      <main className="flex-1 overflow-y-auto p-4 pt-8 md:p-6 md:pt-24">
+        {children}
+      </main>
     </div>
   );
 }
