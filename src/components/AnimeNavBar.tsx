@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { LucideIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
+import { type LucideIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface NavItem {
   name: string;
@@ -23,12 +23,12 @@ export function AnimeNavBar({ items, className }: NavBarProps) {
   const [mounted, setMounted] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
 
-  const activeItem = items.find((item) => item.url === pathname);
-  const activeTab = activeItem ? activeItem.name : items[0].name;
-
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const activeItem = items.find((item) => item.url === pathname) || items[0];
+  const activeTab = activeItem.name;
 
   if (!mounted) return null;
 
@@ -51,8 +51,8 @@ export function AnimeNavBar({ items, className }: NavBarProps) {
         <div className="flex justify-start pt-6">
           <motion.div
             className={cn(
-              'flex flex-col items-center gap-3 bg-black/50 border border-white/10 backdrop-blur-lg py-2 px-2 rounded-3xl shadow-lg relative',
-              className
+                'flex flex-col items-center gap-3 bg-black/50 border border-white/10 backdrop-blur-lg py-2 px-2 rounded-3xl shadow-lg relative',
+                className
             )}
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -125,153 +125,6 @@ export function AnimeNavBar({ items, className }: NavBarProps) {
                       />
                     )}
                   </AnimatePresence>
-
-                  {isActive && (
-                    <motion.div
-                      layoutId="anime-mascot"
-                      className="absolute -left-12 top-1/2 -translate-y-1/2 pointer-events-none"
-                      initial={false}
-                      transition={{
-                        type: 'spring',
-                        stiffness: 300,
-                        damping: 30,
-                      }}
-                    >
-                      <div className="relative w-12 h-12">
-                        <motion.div
-                          className="absolute w-10 h-10 bg-white rounded-full left-1/2 -translate-x-1/2"
-                          animate={
-                            hoveredTab
-                              ? {
-                                  scale: [1, 1.1, 1],
-                                  rotate: [0, -5, 5, 0],
-                                  transition: {
-                                    duration: 0.5,
-                                    ease: 'easeInOut',
-                                  },
-                                }
-                              : {
-                                  y: [0, -3, 0],
-                                  transition: {
-                                    duration: 2,
-                                    repeat: Infinity,
-                                    ease: 'easeInOut',
-                                  },
-                                }
-                          }
-                        >
-                          <motion.div
-                            className="absolute w-2 h-2 bg-black rounded-full"
-                            animate={
-                              hoveredTab
-                                ? {
-                                    scaleY: [1, 0.2, 1],
-                                    transition: {
-                                      duration: 0.2,
-                                      times: [0, 0.5, 1],
-                                    },
-                                  }
-                                : {}
-                            }
-                            style={{ left: '25%', top: '40%' }}
-                          />
-                          <motion.div
-                            className="absolute w-2 h-2 bg-black rounded-full"
-                            animate={
-                              hoveredTab
-                                ? {
-                                    scaleY: [1, 0.2, 1],
-                                    transition: {
-                                      duration: 0.2,
-                                      times: [0, 0.5, 1],
-                                    },
-                                  }
-                                : {}
-                            }
-                            style={{ right: '25%', top: '40%' }}
-                          />
-                          <motion.div
-                            className="absolute w-2 h-1.5 bg-pink-300 rounded-full"
-                            animate={{
-                              opacity: hoveredTab ? 0.8 : 0.6,
-                            }}
-                            style={{ left: '15%', top: '55%' }}
-                          />
-                          <motion.div
-                            className="absolute w-2 h-1.5 bg-pink-300 rounded-full"
-                            animate={{
-                              opacity: hoveredTab ? 0.8 : 0.6,
-                            }}
-                            style={{ right: '15%', top: '55%' }}
-                          />
-
-                          <motion.div
-                            className="absolute w-4 h-2 border-b-2 border-black rounded-full"
-                            animate={
-                              hoveredTab
-                                ? {
-                                    scaleY: 1.5,
-                                    y: -1,
-                                  }
-                                : {
-                                    scaleY: 1,
-                                    y: 0,
-                                  }
-                            }
-                            style={{ left: '30%', top: '60%' }}
-                          />
-                          <AnimatePresence>
-                            {hoveredTab && (
-                              <>
-                                <motion.div
-                                  initial={{ opacity: 0, scale: 0 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0 }}
-                                  className="absolute -top-1 -right-1 w-2 h-2 text-yellow-300"
-                                >
-                                  ✨
-                                </motion.div>
-                                <motion.div
-                                  initial={{ opacity: 0, scale: 0 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0 }}
-                                  transition={{ delay: 0.1 }}
-                                  className="absolute -top-2 left-0 w-2 h-2 text-yellow-300"
-                                >
-                                  ✨
-                                </motion.div>
-                              </>
-                            )}
-                          </AnimatePresence>
-                        </motion.div>
-                        <motion.div
-                          className="absolute -right-1 top-1/2 w-4 h-4 -translate-y-1/2"
-                          animate={
-                            hoveredTab
-                              ? {
-                                  y: [0, -4, 0],
-                                  transition: {
-                                    duration: 0.3,
-                                    repeat: Infinity,
-                                    repeatType: 'reverse',
-                                  },
-                                }
-                              : {
-                                  y: [0, 2, 0],
-                                  transition: {
-                                    duration: 1,
-                                    repeat: Infinity,
-                                    ease: 'easeInOut',
-                                    delay: 0.5,
-                                  },
-                                }
-                          }
-                        >
-                          <div className="w-full h-full bg-white rotate-45 transform origin-center" />
-                        </motion.div>
-                      </div>
-                    </motion.div>
-                  )}
                 </Link>
               );
             })}

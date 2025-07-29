@@ -11,8 +11,10 @@ import {
   Timer,
 } from 'lucide-react';
 import { AnimeNavBar } from './AnimeNavBar';
+import { usePathname } from 'next/navigation';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const menuItems = [
     { name: 'Dashboard', url: '/', icon: LayoutDashboard },
     { name: 'Task Manager', url: '/tasks', icon: CheckSquare },
@@ -26,7 +28,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen w-full">
       <AnimeNavBar items={menuItems} />
-      <main className="ml-28 p-6">{children}</main>
+      <main className="ml-28 p-6 pt-16">{children}</main>
     </div>
   );
 }
