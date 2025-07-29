@@ -24,7 +24,7 @@ import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { getTasks, addTask asaddTaskToSupabase, updateTask, deleteTask as deleteTaskFromSupabase } from '@/lib/supabaseClient';
+import { getTasks, addTask as addTaskToSupabase, updateTask, deleteTask as deleteTaskFromSupabase } from '@/lib/supabaseClient';
 
 const priorityColors = {
   Urgent: 'border-red-500/50 text-red-400',
