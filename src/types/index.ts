@@ -25,12 +25,7 @@ export type Habit = {
 
 export type JournalEntry = {
   id: string;
-  originalEntry: string;
-  reframed: {
-    step1: string;
-    step2: string;
-    reframedVersion: string;
-  };
+  content: string;
   createdAt: string;
 };
 
