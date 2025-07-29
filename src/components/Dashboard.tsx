@@ -23,8 +23,8 @@ import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 
 const chartConfig = {
-  tasks: { label: 'Tasks', color: 'hsl(var(--chart-1))' },
-  habits: { label: 'Habits', color: 'hsl(var(--chart-2))' },
+  tasks: { label: 'Tasks', color: 'hsl(var(--chart-2))' },
+  habits: { label: 'Habits', color: 'hsl(var(--chart-3))' },
   completed: { label: 'Completed', color: 'hsl(var(--chart-1))' },
   pending: { label: 'Pending', color: 'hsl(var(--chart-5))' },
   progress: { label: 'Progress', color: 'hsl(var(--chart-1))' },
@@ -233,8 +233,8 @@ export function Dashboard() {
                 <YAxis allowDecimals={false} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="tasks" fill="hsl(var(--chart-1))" radius={4} />
-                <Bar dataKey="habits" fill="hsl(var(--chart-2))" radius={4} />
+                <Bar dataKey="tasks" fill="hsl(var(--chart-2))" radius={4} />
+                <Bar dataKey="habits" fill="hsl(var(--chart-3))" radius={4} />
               </BarChart>
             </ChartContainer>
           </CardContent>
