@@ -73,6 +73,9 @@
     --sidebar-border: 233 32% 21%;
     --sidebar-ring: 167 87% 51%;
   }
+  .theme {
+    --animate-pulse-slow: pulse-slow 3s ease-in-out infinite;
+  }
 }
 
 @layer base {
@@ -81,5 +84,16 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@theme inline {
+  @keyframes pulse-slow {
+  0%, 100% {
+    transform: translateX(-100%);
+    }
+  50% {
+    transform: translateX(100%);
+    }
   }
 }
