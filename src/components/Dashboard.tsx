@@ -47,10 +47,13 @@ export function Dashboard() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        // Load Tasks and Habits from Supabase
         const [loadedTasks, loadedHabits] = await Promise.all([getTasks(), getHabits()]);
-        setTasks(loadedTasks);
-        setHabits(loadedHabits);
+        
+        const tasksData = loadedTasks || [];
+        const habitsData = loadedHabits || [];
+
+        setTasks(tasksData);
+        setHabits(habitsData);
 
         // Process Weekly Activity
         const weekStartsOn = 1; // Monday
@@ -59,8 +62,8 @@ export function Dashboard() {
         
         const activity = days.map(day => {
           const dateKey = format(day, 'yyyy-MM-dd');
-          const tasksCompletedOnDay = loadedTasks.filter(t => t.isCompleted && t.dueDate === dateKey).length;
-          const habitsCompletedOnDay = loadedHabits.filter(h => h.completions[dateKey]).length;
+          const tasksCompletedOnDay = tasksData.filter(t => t.isCompleted && t.dueDate === dateKey).length;
+          const habitsCompletedOnDay = habitsData.filter(h => h.completions && h.completions[dateKey]).length;
           return {
             day: format(day, 'E'),
             tasks: tasksCompletedOnDay,
@@ -73,10 +76,10 @@ export function Dashboard() {
         const last7Days = Array.from({ length: 7 }).map((_, i) => subDays(new Date(), i)).reverse();
         const progressData = last7Days.map(day => {
           const dateKey = format(day, 'yyyy-MM-dd');
-          const totalTasks = loadedTasks.filter(t => t.dueDate === dateKey).length;
-          const completedTasks = loadedTasks.filter(t => t.isCompleted && t.dueDate === dateKey).length;
-          const totalHabits = loadedHabits.length;
-          const completedHabits = loadedHabits.filter(h => h.completions[dateKey]).length;
+          const totalTasks = tasksData.filter(t => t.dueDate === dateKey).length;
+          const completedTasks = tasksData.filter(t => t.isCompleted && t.dueDate === dateKey).length;
+          const totalHabits = habitsData.length;
+          const completedHabits = habitsData.filter(h => h.completions && h.completions[dateKey]).length;
           const dailyCompletion = (totalTasks + totalHabits) > 0 ? ((completedTasks + completedHabits) / (totalTasks + totalHabits)) * 100 : 0;
           return {
             date: format(day, 'MMM d'),
@@ -84,6 +87,7 @@ export function Dashboard() {
           };
         });
         setDailyProgress(progressData);
+        
       } catch (error) {
         console.error("Failed to load dashboard data", error);
         toast({ variant: 'destructive', title: 'Error fetching dashboard data.', description: 'Could not connect to the database. Please check your connection and Supabase setup.' });
@@ -96,14 +100,14 @@ export function Dashboard() {
   }, [toast]);
 
   if (isLoading) {
-    return <div className="text-center text-muted-foreground pt-10">Loading dashboard...</div>
+    return <div className="text-center text-muted-foreground pt-10">Loading dashboard...</div>;
   }
 
   const completedTasks = tasks.filter(t => t.isCompleted).length;
   const pendingTasks = tasks.length - completedTasks;
   const overallProgress = (tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0);
   
-  const longestStreak = habits.reduce((max, h) => h.streak > max ? h.streak : max, 0);
+  const longestStreak = habits.reduce((max, h) => (h.streak > max ? h.streak : max), 0);
 
   const taskCompletionChartData = [
     { status: 'Completed', value: completedTasks, fill: 'hsl(var(--chart-1))' },
@@ -111,7 +115,7 @@ export function Dashboard() {
   ];
 
   const tasksForToday = tasks.filter(t => !t.isCompleted && t.dueDate === format(new Date(), 'yyyy-MM-dd'));
-  const habitsForToday = habits.filter(h => !h.completions[format(new Date(), 'yyyy-MM-dd')]);
+  const habitsForToday = habits.filter(h => h.completions && !h.completions[format(new Date(), 'yyyy-MM-dd')]);
   
   return (
     <div className="space-y-6">
@@ -193,7 +197,7 @@ export function Dashboard() {
           <CardHeader>
             <CardTitle>Quick Look</CardTitle>
             <CardDescription>What's on your plate for today.</CardDescription>
-          </CardHeader>
+          </Header>
           <CardContent className="space-y-4">
               <div>
                   <h4 className="text-sm font-medium mb-2">Pending Tasks</h4>
