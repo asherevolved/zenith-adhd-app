@@ -86,15 +86,13 @@ export function Dashboard() {
         setDailyProgress(progressData);
       } catch (error) {
         console.error("Failed to load dashboard data", error);
-        toast({ variant: 'destructive', title: 'Error fetching dashboard data.' });
+        toast({ variant: 'destructive', title: 'Error fetching dashboard data.', description: 'Could not connect to the database. Please check your connection and Supabase setup.' });
       } finally {
         setIsLoading(false);
       }
     };
 
     loadData();
-    // You might want a better way to trigger re-fetches, e.g., a refresh button 
-    // or listening to custom events when data changes in other components.
   }, [toast]);
 
   if (isLoading) {

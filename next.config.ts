@@ -2,6 +2,7 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Added a comment to force a reload of environment variables
   typescript: {
     ignoreBuildErrors: true,
   },

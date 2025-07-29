@@ -1,10 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Task, Habit, JournalEntry } from '@/types';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+// Using hardcoded values as a workaround for environment variable loading issues.
+const supabaseUrl = 'https://gxjaanbqbfwwrcweugsz.supabase.co'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4amFhbmJxYmZ3d3Jjd2V1Z3N6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4MTc2NDYsImV4cCI6MjA2OTM5MzY0Nn0.bTUAPXOCstIuxPxUcH92N6QRDwH8wf1RuLFefudeyUk'
 
 if (!supabaseUrl || !supabaseAnonKey) {
+    // This check is kept in case the hardcoded values are removed later.
     throw new Error('Supabase URL and anon key are required.');
 }
 
