@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'Zenith',
+  title: 'Mindful Me',
   description: 'A web-based ADHD productivity and wellness platform.',
 };
 

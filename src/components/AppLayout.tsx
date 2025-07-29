@@ -25,7 +25,7 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { ZenithLogo } from './icons/Logo';
+import { MindfulMeLogo } from './icons/Logo';
 import { Button } from './ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { parseVoiceCommand } from '@/ai/flows/voice-command-parser';
@@ -75,8 +75,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar>
         <SidebarHeader>
           <div className="flex items-center gap-2">
-            <ZenithLogo className="size-8" />
-            <h1 className="text-2xl font-headline font-semibold">Zenith</h1>
+            <MindfulMeLogo className="size-8" />
+            <h1 className="text-2xl font-headline font-semibold">Mindful Me</h1>
           </div>
         </SidebarHeader>
         <SidebarContent>
