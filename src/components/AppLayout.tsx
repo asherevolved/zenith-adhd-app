@@ -26,7 +26,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen w-full">
       <AnimeNavBar items={menuItems} />
-      <main className="pl-24 pr-6 py-6">{children}</main>
+      <main className="ml-28 p-6">{children}</main>
     </div>
   );
 }
