@@ -4,7 +4,6 @@ import * as React from 'react';
 import { PlusCircle, MoreVertical, Trash2, Bell, X, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -32,68 +31,65 @@ const priorityColors = {
   Low: 'bg-green-500/20 text-green-400 border-green-500/30',
 };
 
-function TaskCard({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, onToggle: (id: string) => void, onDelete: (id: string) => void, onSubtaskToggle: (taskId: string, subtaskId: string) => void }) {
+function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, onToggle: (id: string) => void, onDelete: (id: string) => void, onSubtaskToggle: (taskId: string, subtaskId: string) => void }) {
   const completedSubtasks = task.subtasks.filter(st => st.isCompleted).length;
   const progress = task.subtasks.length > 0 ? (completedSubtasks / task.subtasks.length) * 100 : (task.isCompleted ? 100 : 0);
 
   return (
-    <Card className="bg-card/80 backdrop-blur-sm transition-all hover:bg-card">
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1">
-                <Checkbox checked={task.isCompleted} onCheckedChange={() => onToggle(task.id)} className="size-5" />
-                <CardTitle className={`text-base font-medium ${task.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
-                  {task.title}
-                </CardTitle>
-            </div>
-            <div className="flex items-center gap-1">
-                 <Badge variant="outline" className={priorityColors[task.priority]}>{task.priority}</Badge>
-                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="size-8 shrink-0">
-                      <MoreVertical className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => onToggle(task.id)}>
-                      {task.isCompleted ? 'Mark as Not Done' : 'Mark as Done'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-400" onClick={() => onDelete(task.id)}>
-                        <Trash2 className="mr-2 size-4" />
-                        Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-        </div>
-        <p className="text-xs text-muted-foreground pt-1 pl-8">Due: {task.dueDate}</p>
-      </CardHeader>
-      <CardContent>
-        {task.subtasks.length > 0 && (
-          <div className="pl-8 mt-2 space-y-3">
-            <div className="space-y-2">
-                {task.subtasks.map(subtask => (
-                    <div key={subtask.id} className="flex items-center gap-3">
-                        <Checkbox 
-                            id={`subtask-${subtask.id}`} 
-                            checked={subtask.isCompleted}
-                            onCheckedChange={() => onSubtaskToggle(task.id, subtask.id)}
-                            className="size-4"
-                        />
-                        <Label htmlFor={`subtask-${subtask.id}`} className={`text-sm ${subtask.isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                            {subtask.title}
-                        </Label>
-                    </div>
-                ))}
-            </div>
-            <div className="flex items-center gap-2">
-                <Progress value={progress} className="h-2" />
-                <span className="text-xs text-muted-foreground">{Math.round(progress)}%</span>
-            </div>
+    <div className="bg-card/80 backdrop-blur-sm transition-all hover:bg-card p-4 rounded-lg border">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3 flex-1">
+          <Checkbox checked={task.isCompleted} onCheckedChange={() => onToggle(task.id)} className="size-5" />
+          <div className={`text-base font-medium ${task.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
+            {task.title}
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+        <div className="flex items-center gap-1">
+          <Badge variant="outline" className={priorityColors[task.priority]}>{task.priority}</Badge>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8 shrink-0">
+                <MoreVertical className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => onToggle(task.id)}>
+                {task.isCompleted ? 'Mark as Not Done' : 'Mark as Done'}
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-red-400" onClick={() => onDelete(task.id)}>
+                <Trash2 className="mr-2 size-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground pt-1 pl-8">Due: {task.dueDate}</p>
+      
+      {task.subtasks.length > 0 && (
+        <div className="pl-8 mt-4 space-y-3">
+          <div className="space-y-2">
+            {task.subtasks.map(subtask => (
+              <div key={subtask.id} className="flex items-center gap-3">
+                <Checkbox
+                  id={`subtask-${subtask.id}`}
+                  checked={subtask.isCompleted}
+                  onCheckedChange={() => onSubtaskToggle(task.id, subtask.id)}
+                  className="size-4"
+                />
+                <Label htmlFor={`subtask-${subtask.id}`} className={`text-sm ${subtask.isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                  {subtask.title}
+                </Label>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <Progress value={progress} className="h-2" />
+            <span className="text-xs text-muted-foreground">{Math.round(progress)}%</span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -360,19 +356,19 @@ export function TaskManager() {
         </TabsList>
         <div className="mt-4 flex-1">
           <TabsContent value="today" className="space-y-4">
-            {filteredTasks('Today').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
+            {filteredTasks('Today').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
             {filteredTasks('Today').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for today. Great job!</p>}
           </TabsContent>
           <TabsContent value="upcoming" className="space-y-4">
-            {filteredTasks('Upcoming').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
+            {filteredTasks('Upcoming').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
             {filteredTasks('Upcoming').length === 0 && <p className="text-center text-muted-foreground pt-10">No upcoming tasks.</p>}
           </TabsContent>
           <TabsContent value="someday" className="space-y-4">
-            {filteredTasks('Someday').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
+            {filteredTasks('Someday').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
             {filteredTasks('Someday').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for someday.</p>}
           </TabsContent>
           <TabsContent value="completed" className="space-y-4">
-            {filteredTasks('Completed').map(task => <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
+            {filteredTasks('Completed').map(task => <TaskItem key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onSubtaskToggle={toggleSubtaskCompletion} />)}
             {filteredTasks('Completed').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks completed yet.</p>}
           </TabsContent>
         </div>
