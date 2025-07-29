@@ -79,7 +79,7 @@ export function Dashboard() {
   const overallProgress = (taskData.completed / (taskData.completed + taskData.pending) * 100) || 0;
 
   return (
-    <div className="grid gap-6">
+    <div className="space-y-6">
       <div className="space-y-1.5">
         <h2 className="font-headline text-3xl font-bold tracking-tight">
           Your Progress Dashboard
@@ -88,7 +88,8 @@ export function Dashboard() {
           You've completed {Math.round(overallProgress)}% of your tasks. Keep up the great work!
         </p>
       </div>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      
+      <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Completed Tasks</CardTitle>
@@ -119,19 +120,21 @@ export function Dashboard() {
             <p className="text-xs text-muted-foreground">Incredible consistency!</p>
           </CardContent>
         </Card>
+      </div>
 
-        <Card className="md:col-span-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Task Completion Status</CardTitle>
+            <CardTitle>Task Completion</CardTitle>
             <CardDescription>A breakdown of your current tasks.</CardDescription>
           </CardHeader>
-          <CardContent className="pl-2">
+          <CardContent className="flex justify-center pl-2">
             <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
               <PieChart>
                 <ChartTooltip
                   content={<ChartTooltipContent nameKey="status" hideLabel />}
                 />
-                <Pie data={taskCompletionChartData} dataKey="value" nameKey="status" innerRadius={60} />
+                <Pie data={taskCompletionChartData} dataKey="value" nameKey="status" innerRadius={60} outerRadius={80} />
                 <ChartLegend
                   content={<ChartLegendContent nameKey="status" />}
                   className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
@@ -141,13 +144,13 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-3">
+        <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Weekly Activity</CardTitle>
             <CardDescription>Tasks vs. Habits Completed This Week</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
+            <ChartContainer config={chartConfig} className="h-[250px] w-full">
               <BarChart data={weeklyActivity}>
                 <CartesianGrid vertical={false} />
                 <XAxis
