@@ -99,6 +99,10 @@ export function Dashboard() {
     loadData();
   }, [toast]);
 
+  if (isLoading) {
+    return <div className="text-center text-muted-foreground pt-10">Loading dashboard...</div>;
+  }
+
   const completedTasks = tasks.filter(t => t.isCompleted).length;
   const pendingTasks = tasks.length - completedTasks;
   const overallProgress = (tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0);
@@ -112,10 +116,6 @@ export function Dashboard() {
 
   const tasksForToday = tasks.filter(t => !t.isCompleted && t.dueDate === format(new Date(), 'yyyy-MM-dd'));
   const habitsForToday = habits.filter(h => h.completions && !h.completions[format(new Date(), 'yyyy-MM-dd')]);
-  
-  if (isLoading) {
-    return <div className="text-center text-muted-foreground pt-10">Loading dashboard...</div>;
-  }
   
   return (
     <div className="space-y-6">
