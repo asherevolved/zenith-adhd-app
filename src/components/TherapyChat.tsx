@@ -42,12 +42,13 @@ export function TherapyChat() {
     setIsLoading(true);
 
     try {
-      const chatHistory = newMessages.slice(-6, -1); // Last 5 messages for context, excluding the current one
+      const chatHistory = newMessages.slice(0, -1).slice(-5); // Get the last 5 messages for context
       const chatInput: TherapyChatInput = { message: input, chatHistory: chatHistory.map(m => ({role: m.role, content: m.content})) };
       const result = await therapyChat(chatInput);
       const assistantMessage: Message = { role: 'assistant', content: result.response };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
+      console.error(error);
       const errorMessage: Message = { role: 'assistant', content: "Sorry, I'm having trouble connecting right now." };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
