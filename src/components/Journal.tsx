@@ -1,19 +1,35 @@
 'use client';
 
 import * as React from 'react';
-import { Sparkles, Loader2, BookCheck, MessageSquareQuote, Bot } from 'lucide-react';
+import { Sparkles, Loader2, BookCheck, MessageSquareQuote, Bot, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { journalReframer, type JournalReframerOutput } from '@/ai/flows/journal-reframer';
+import type { JournalEntry } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 export function Journal() {
   const [journalEntry, setJournalEntry] = React.useState('');
   const [reframed, setReframed] = React.useState<JournalReframerOutput | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
-  
+  const [savedEntries, setSavedEntries] = React.useState<JournalEntry[]>([]);
+  const { toast } = useToast();
+
+  React.useEffect(() => {
+    try {
+      const storedEntries = localStorage.getItem('mindful-me-journal-entries');
+      if (storedEntries) {
+        setSavedEntries(JSON.parse(storedEntries));
+      }
+    } catch (error) {
+      console.error('Failed to load journal entries from localStorage', error);
+    }
+  }, []);
+
   const handleReframe = async () => {
     if (!journalEntry.trim()) return;
     setIsLoading(true);
@@ -22,10 +38,43 @@ export function Journal() {
       const result = await journalReframer({ journalEntry });
       setReframed(result);
     } catch (error) {
-      console.error("Failed to reframe journal entry", error);
-      // You could show a toast notification here
+      console.error('Failed to reframe journal entry', error);
+      toast({
+        title: 'Error',
+        description: 'Could not reframe the journal entry. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveJournal = () => {
+    if (!reframed || !journalEntry) return;
+
+    const newEntry: JournalEntry = {
+      id: crypto.randomUUID(),
+      originalEntry: journalEntry,
+      reframed: reframed,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedEntries = [newEntry, ...savedEntries];
+    setSavedEntries(updatedEntries);
+
+    try {
+      localStorage.setItem('mindful-me-journal-entries', JSON.stringify(updatedEntries));
+      toast({
+        title: 'Journal Saved',
+        description: 'Your reframed thoughts have been saved.',
+      });
+    } catch (error) {
+      console.error('Failed to save journal entry to localStorage', error);
+      toast({
+        title: 'Error',
+        description: 'Could not save the journal entry.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -89,6 +138,9 @@ export function Journal() {
                          <h3 className="font-semibold flex items-center gap-2"><Sparkles className="size-4 text-primary" /> Reframed version</h3>
                          <p className="text-muted-foreground p-3 bg-background/50 rounded-md">{reframed.reframedVersion}</p>
                       </div>
+                      <Button onClick={handleSaveJournal} className="w-full mt-4">
+                        <Save className="mr-2 size-4" /> Save Journal
+                      </Button>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -97,14 +149,50 @@ export function Journal() {
         </div>
       </TabsContent>
       <TabsContent value="positive_reminders">
-         <Card>
-          <CardHeader>
-            <CardTitle>Your Positive Reminders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">Your saved reframed thoughts will appear here.</p>
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          {savedEntries.length > 0 ? (
+            savedEntries.map(entry => (
+              <Card key={entry.id}>
+                <CardHeader>
+                  <CardTitle className="text-lg">Journal Entry</CardTitle>
+                  <CardDescription>
+                    {format(new Date(entry.createdAt), "MMMM d, yyyy 'at' h:mm a")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div>
+                    <h3 className="font-semibold mb-2">Your Original Thought</h3>
+                    <blockquote className="border-l-2 pl-4 italic text-muted-foreground">
+                      {entry.originalEntry}
+                    </blockquote>
+                  </div>
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">AI Reframed Perspective</h3>
+                    <div className="space-y-2 text-sm">
+                        <h4 className="font-medium flex items-center gap-2"><MessageSquareQuote className="size-4 text-primary" /> What happened?</h4>
+                        <p className="text-muted-foreground p-3 bg-background/50 rounded-md">{entry.reframed.step1}</p>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                         <h4 className="font-medium flex items-center gap-2"><BookCheck className="size-4 text-primary" /> What would you say to a friend?</h4>
+                         <p className="text-muted-foreground p-3 bg-background/50 rounded-md">{entry.reframed.step2}</p>
+                    </div>
+                     <div className="space-y-2 text-sm">
+                         <h4 className="font-medium flex items-center gap-2"><Sparkles className="size-4 text-primary" /> Reframed version</h4>
+                         <p className="text-muted-foreground p-3 bg-background/50 rounded-md">{entry.reframed.reframedVersion}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+             <Card>
+              <CardContent className="py-20 text-center">
+                <h3 className="text-xl font-semibold">No saved reminders yet.</h3>
+                <p className="text-muted-foreground mt-2">Reframe a journal entry and save it to see it here.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </TabsContent>
     </Tabs>
   );
