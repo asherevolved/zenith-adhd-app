@@ -36,7 +36,7 @@ function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, o
   const progress = task.subtasks.length > 0 ? (completedSubtasks / task.subtasks.length) * 100 : (task.isCompleted ? 100 : 0);
 
   return (
-    <div className="bg-card/50 transition-all hover:bg-card/70 p-4 rounded-lg border">
+    <div className="bg-transparent transition-all p-4 rounded-lg">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 flex-1">
           <Checkbox checked={task.isCompleted} onCheckedChange={() => onToggle(task.id)} className="size-5" />
@@ -250,10 +250,10 @@ export function TaskManager() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Task Manager</h1>
+        <h1 className="text-2xl font-semibold text-white">Task Manager</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="bg-transparent text-white border border-white hover:bg-white hover:text-black">
               <PlusCircle className="mr-2 size-4" /> Add Task
             </Button>
           </DialogTrigger>
