@@ -68,8 +68,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div>
       <AnimeNavBar items={animeNavItems} defaultActive={activeLabel} />
-      <div className="pt-24">
-        <header className="flex h-12 items-center justify-between border-b bg-background/50 backdrop-blur-sm px-4 md:h-14 md:px-6">
+      <div className="md:pt-24">
+        <header className="flex h-16 items-center justify-between border-b bg-background/50 px-4 backdrop-blur-sm md:px-6">
           <div className="flex items-center gap-4">
             {isMobile && (
               <Sheet>
