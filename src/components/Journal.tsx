@@ -9,34 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { JournalEntry } from '@/types';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { getJournalEntries, addJournalEntry } from '@/lib/supabaseClient';
 
 export function Journal() {
   const [journalEntry, setJournalEntry] = React.useState('');
   const [savedEntries, setSavedEntries] = React.useState<JournalEntry[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
   const { toast } = useToast();
-
-  React.useEffect(() => {
-    fetchEntries();
-  }, []);
-
-  const fetchEntries = async () => {
-    try {
-      setIsLoading(true);
-      const entries = await getJournalEntries();
-      setSavedEntries(entries);
-    } catch (error) {
-      console.error('Failed to load journal entries', error);
-      toast({
-        title: 'Error',
-        description: 'Could not load journal entries.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleSaveJournal = async () => {
     if (!journalEntry.trim()) {
@@ -48,27 +25,18 @@ export function Journal() {
       return;
     }
 
-    const newEntryData = {
+    const newEntry: JournalEntry = {
+      id: crypto.randomUUID(),
       content: journalEntry,
       createdAt: new Date().toISOString(),
     };
-
-    try {
-      const newEntry = await addJournalEntry(newEntryData);
-      setSavedEntries([newEntry, ...savedEntries]);
-      toast({
-        title: 'Journal Saved',
-        description: 'Your entry has been successfully saved.',
-      });
-      setJournalEntry(''); // Clear textarea after saving
-    } catch (error) {
-      console.error('Failed to save journal entry', error);
-      toast({
-        title: 'Error',
-        description: 'Could not save the journal entry.',
-        variant: 'destructive',
-      });
-    }
+    
+    setSavedEntries([newEntry, ...savedEntries]);
+    toast({
+      title: 'Journal Saved',
+      description: 'Your entry has been successfully saved locally.',
+    });
+    setJournalEntry(''); // Clear textarea after saving
   };
 
   return (
@@ -81,7 +49,7 @@ export function Journal() {
         <Card>
           <CardHeader>
             <CardTitle>How are you feeling today?</CardTitle>
-            <CardDescription>Write down your thoughts and feelings. They will be saved to your account.</CardDescription>
+            <CardDescription>Write down your thoughts and feelings. They will be saved locally.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Textarea
@@ -99,9 +67,7 @@ export function Journal() {
       </TabsContent>
       <TabsContent value="saved_entries">
         <div className="space-y-6">
-          {isLoading ? (
-            <p className="text-center text-muted-foreground pt-10">Loading entries...</p>
-          ) : savedEntries.length > 0 ? (
+          {savedEntries.length > 0 ? (
             savedEntries.map(entry => (
               <Card key={entry.id}>
                 <CardHeader>

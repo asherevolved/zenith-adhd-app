@@ -24,7 +24,6 @@ import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { getTasks, addTask as addTaskToSupabase, updateTask, deleteTask as deleteTaskFromSupabase } from '@/lib/supabaseClient';
 
 const priorityColors = {
   Urgent: 'border-red-500/50 text-red-400',
@@ -97,7 +96,6 @@ function TaskItem({ task, onToggle, onDelete, onSubtaskToggle }: { task: Task, o
 export function TaskManager() {
   const { toast } = useToast();
   const [tasks, setTasks] = React.useState<Task[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   
   const [newTaskTitle, setNewTaskTitle] = React.useState('');
@@ -107,52 +105,6 @@ export function TaskManager() {
   const [subtasks, setSubtasks] = React.useState<Partial<Subtask>[]>([{ title: '' }]);
   const [newReminder, setNewReminder] = React.useState('');
 
-  React.useEffect(() => {
-    fetchTasks();
-  }, []);
-  
-  const fetchTasks = async () => {
-    try {
-      setIsLoading(true);
-      const tasksFromSupabase = await getTasks();
-      setTasks(tasksFromSupabase);
-    } catch (error) {
-      console.error("Failed to load tasks", error);
-      toast({ variant: 'destructive', title: 'Error fetching tasks.' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-
-  const requestNotificationPermission = async () => {
-    if (!('Notification' in window)) {
-      toast({ variant: 'destructive', title: 'This browser does not support desktop notification' });
-      return false;
-    }
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      toast({ variant: 'destructive', title: 'Notification permission denied!' });
-      return false;
-    }
-    return true;
-  };
-
-  const scheduleNotification = (task: Task) => {
-    if (!task.reminder || task.reminder <= 0) return;
-
-    const reminderTime = new Date(new Date().getTime() + task.reminder * 60000);
-    
-    setTimeout(() => {
-        new Notification('Mindful Me Reminder', {
-            body: `It's time for your task: ${task.title}`,
-            icon: '/logo.svg'
-        });
-    }, reminderTime.getTime() - new Date().getTime());
-
-    toast({ title: "Reminder set!", description: `You will be notified for "${task.title}" in ${task.reminder} minutes.` });
-  };
-  
   const resetForm = () => {
     setNewTaskTitle('');
     setNewTaskNotes('');
@@ -165,12 +117,6 @@ export function TaskManager() {
 
   const addTask = async () => {
     if (!newTaskTitle.trim()) return;
-
-    const reminderMinutes = parseInt(newReminder, 10);
-    if (reminderMinutes > 0) {
-        const permissionGranted = await requestNotificationPermission();
-        if (!permissionGranted) return;
-    }
     
     const finalSubtasks = subtasks
         .filter(st => st.title && st.title.trim() !== '')
@@ -180,7 +126,8 @@ export function TaskManager() {
             isCompleted: false
         }));
 
-    const newTaskData = {
+    const newTask: Task = {
+      id: crypto.randomUUID(),
       title: newTaskTitle,
       notes: newTaskNotes,
       dueDate: format(new Date(), 'yyyy-MM-dd'),
@@ -188,20 +135,11 @@ export function TaskManager() {
       status: newTaskStatus,
       isCompleted: false,
       subtasks: finalSubtasks,
-      reminder: reminderMinutes > 0 ? reminderMinutes : undefined,
     };
 
-    try {
-        const newTask = await addTaskToSupabase(newTaskData);
-        setTasks([newTask, ...tasks]);
-        if (newTask.reminder) {
-            scheduleNotification(newTask);
-        }
-        resetForm();
-    } catch(error) {
-        console.error("Failed to add task", error);
-        toast({ variant: 'destructive', title: 'Failed to add task.' });
-    }
+    setTasks([newTask, ...tasks]);
+    toast({ title: "Task Added", description: "Your task has been added locally."})
+    resetForm();
   }
   
   const handleSubtaskChange = (index: number, value: string) => {
@@ -219,44 +157,28 @@ export function TaskManager() {
     setSubtasks(newSubtasks);
   };
 
-  const toggleTaskCompletion = async (id: string, isCompleted: boolean) => {
-    try {
-        const updatedTask = await updateTask(id, { isCompleted });
-        setTasks(tasks.map(task => 
-          task.id === id ? { ...task, ...updatedTask } : task
-        ));
-    } catch(error) {
-        console.error("Failed to update task", error);
-        toast({ variant: 'destructive', title: 'Failed to update task.' });
-    }
+  const toggleTaskCompletion = (id: string, isCompleted: boolean) => {
+    setTasks(tasks.map(task => 
+      task.id === id ? { ...task, isCompleted } : task
+    ));
   };
 
-  const toggleSubtaskCompletion = async (taskId: string, subtaskId: string, isCompleted: boolean) => {
-    const taskToUpdate = tasks.find(t => t.id === taskId);
-    if (!taskToUpdate) return;
-    
-    const updatedSubtasks = taskToUpdate.subtasks.map(st => 
-        st.id === subtaskId ? { ...st, isCompleted } : st
-    );
-    const allSubtasksCompleted = updatedSubtasks.every(st => st.isCompleted);
-    
-    try {
-        const updatedTask = await updateTask(taskId, { subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted });
-        setTasks(tasks.map(t => t.id === taskId ? { ...t, ...updatedTask } : t));
-    } catch(error) {
-        console.error("Failed to update subtask", error);
-        toast({ variant: 'destructive', title: 'Failed to update subtask.' });
-    }
+  const toggleSubtaskCompletion = (taskId: string, subtaskId: string, isCompleted: boolean) => {
+    setTasks(tasks.map(t => {
+      if (t.id === taskId) {
+        const updatedSubtasks = t.subtasks.map(st => 
+            st.id === subtaskId ? { ...st, isCompleted } : st
+        );
+        const allSubtasksCompleted = updatedSubtasks.every(st => st.isCompleted);
+        return { ...t, subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted };
+      }
+      return t;
+    }));
   };
   
-  const deleteTask = async (id: string) => {
-      try {
-        await deleteTaskFromSupabase(id);
-        setTasks(tasks.filter(task => task.id !== id));
-      } catch(error) {
-        console.error("Failed to delete task", error);
-        toast({ variant: 'destructive', title: 'Failed to delete task.' });
-      }
+  const deleteTask = (id: string) => {
+      setTasks(tasks.filter(task => task.id !== id));
+      toast({ title: "Task Deleted" });
   }
 
   const filteredTasks = (status: Task['status']) => tasks.filter(task => {
@@ -269,10 +191,6 @@ export function TaskManager() {
      }
      return !task.isCompleted && task.status === status;
   });
-  
-  if (isLoading) {
-    return <div className="text-center text-muted-foreground pt-10">Loading tasks...</div>
-  }
 
   return (
     <div className="flex h-full flex-col">
@@ -336,7 +254,9 @@ export function TaskManager() {
                     onChange={(e) => setNewReminder(e.target.value)}
                     placeholder="e.g. 15"
                     className="mt-1"
+                    disabled
                    />
+                   <p className="text-xs text-muted-foreground mt-1">Notifications are disabled.</p>
                 </div>
               </div>
               {/* Right Column */}

@@ -1,11 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { PlusCircle, Flame, MoreVertical, Trash2 } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { startOfWeek, addDays, format, isSameDay, subDays } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -17,165 +15,20 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import type { Habit } from '@/types';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { useToast } from '@/hooks/use-toast';
-import { getHabits, addHabit as addHabitToSupabase, updateHabit, deleteHabit as deleteHabitFromSupabase } from '@/lib/supabaseClient';
-
-
-const DayIndicator = ({ date, isCompleted, onToggle, isTodayFlag }: { date: Date, isCompleted: boolean, onToggle: () => void, isTodayFlag: boolean }) => {
-    const dayOfMonth = format(date, 'd');
-    const dayOfWeek = format(date, 'E');
-
-    return (
-        <TooltipProvider>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={onToggle}>
-                        <span className="text-xs text-muted-foreground">{dayOfWeek}</span>
-                        <div
-                            className={`size-8 flex items-center justify-center rounded-full transition-all 
-                            ${isCompleted ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}
-                            ${isTodayFlag ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
-                        >
-                            {dayOfMonth}
-                        </div>
-                    </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>{format(date, 'MMMM d, yyyy')}</p>
-                </TooltipContent>
-            </Tooltip>
-        </TooltipProvider>
-    );
-};
-
-const HabitCalendar = ({ habit, onToggle }: { habit: Habit, onToggle: (date: Date) => void }) => {
-    const weekStartsOn = 1; // Monday
-    const today = new Date();
-    const weekStart = startOfWeek(today, { weekStartsOn });
-    const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
-
-    return (
-        <div className="flex justify-between">
-            {days.map((day) => {
-                const dateKey = format(day, 'yyyy-MM-dd');
-                return (
-                    <DayIndicator
-                        key={dateKey}
-                        date={day}
-                        isCompleted={!!habit.completions[dateKey]}
-                        isTodayFlag={isSameDay(day, today)}
-                        onToggle={() => onToggle(day)}
-                    />
-                );
-            })}
-        </div>
-    );
-};
-
 
 export function HabitTracker() {
-  const [habits, setHabits] = React.useState<Habit[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [habits, setHabits] = React.useState<any[]>([]);
   const [newHabitName, setNewHabitName] = React.useState('');
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const { toast } = useToast();
 
-  React.useEffect(() => {
-    fetchHabits();
-  }, []);
-
-  const fetchHabits = async () => {
-    try {
-      setIsLoading(true);
-      const habitsFromSupabase = await getHabits();
-      setHabits(habitsFromSupabase);
-    } catch (error) {
-      console.error("Failed to load habits", error);
-      toast({ variant: 'destructive', title: 'Error fetching habits.' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-
-  const calculateStreak = (completions: Record<string, boolean>): number => {
-    let streak = 0;
-    let currentDate = new Date();
-    
-    // If today's habit is not completed, start checking from yesterday
-    if (!completions[format(currentDate, 'yyyy-MM-dd')]) {
-        currentDate = subDays(currentDate, 1);
-    }
-  
-    while (true) {
-      const dateKey = format(currentDate, 'yyyy-MM-dd');
-      if (completions[dateKey]) {
-        streak++;
-        currentDate = subDays(currentDate, 1);
-      } else {
-        break;
-      }
-    }
-    return streak;
-  };
-
-  const addHabit = async () => {
+  const addHabit = () => {
     if (!newHabitName.trim()) return;
-    const newHabitData = {
-      name: newHabitName,
-      streak: 0,
-      completions: {},
-    };
-    try {
-        const newHabit = await addHabitToSupabase(newHabitData);
-        setHabits([...habits, newHabit]);
-        setNewHabitName('');
-        setIsDialogOpen(false);
-    } catch (error) {
-        console.error("Failed to add habit", error);
-        toast({ variant: 'destructive', title: 'Failed to add habit.' });
-    }
-  };
-
-  const deleteHabit = async (id: string) => {
-    try {
-        await deleteHabitFromSupabase(id);
-        setHabits(habits.filter(habit => habit.id !== id));
-    } catch (error) {
-        console.error("Failed to delete habit", error);
-        toast({ variant: 'destructive', title: 'Failed to delete habit.' });
-    }
+    // Mock adding habit
+    setHabits([...habits, { id: crypto.randomUUID(), name: newHabitName, streak: 0, completions: {} }]);
+    setNewHabitName('');
+    setIsDialogOpen(false);
   };
   
-  const toggleHabitCompletion = async (habitId: string, date: Date) => {
-    const habitToUpdate = habits.find(h => h.id === habitId);
-    if (!habitToUpdate) return;
-    
-    const dateKey = format(date, 'yyyy-MM-dd');
-    const newCompletions = { ...habitToUpdate.completions, [dateKey]: !habitToUpdate.completions[dateKey] };
-    const newStreak = calculateStreak(newCompletions);
-    
-    try {
-        const updatedHabit = await updateHabit(habitId, { completions: newCompletions, streak: newStreak });
-        setHabits(habits.map(h => h.id === habitId ? { ...h, ...updatedHabit } : h));
-    } catch (error) {
-        console.error("Failed to update habit", error);
-        toast({ variant: 'destructive', title: 'Failed to update habit.' });
-    }
-  };
-
-  const isHabitCompletedToday = (habit: Habit) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    return !!habit.completions[todayKey];
-  }
-  
-  if (isLoading) {
-    return <div className="text-center text-muted-foreground pt-10">Loading habits...</div>
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -220,32 +73,11 @@ export function HabitTracker() {
           {habits.map(habit => (
             <Card key={habit.id}>
               <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 pr-4">
-                      <CardTitle>{habit.name}</CardTitle>
-                      <CardDescription className="flex items-center gap-1 text-amber-400 mt-1">
-                          <Flame className="size-4" /> {habit.streak} day streak
-                      </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox className="size-6" checked={isHabitCompletedToday(habit)} onCheckedChange={() => toggleHabitCompletion(habit.id, new Date())} />
-                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-8">
-                            <MoreVertical className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem className="text-red-400" onClick={() => deleteHabit(habit.id)}>
-                            <Trash2 className="mr-2 size-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                  </div>
-                </div>
+                <CardTitle>{habit.name}</CardTitle>
+                <CardDescription>Streak: {habit.streak} days</CardDescription>
               </CardHeader>
               <CardContent>
-                  <HabitCalendar habit={habit} onToggle={(date) => toggleHabitCompletion(habit.id, date)} />
+                <p className="text-sm text-muted-foreground">Track your progress here.</p>
               </CardContent>
             </Card>
           ))}
