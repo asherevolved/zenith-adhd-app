@@ -31,11 +31,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const menuItems = [
     { name: 'Dashboard', url: '/', icon: LayoutDashboard },
-    { name: 'Task Manager', url: '/tasks', icon: CheckSquare },
-    { name: 'AI Therapy', url: '/therapy', icon: MessageCircle },
+    { name: 'Tasks', url: '/tasks', icon: CheckSquare },
+    { name: 'Therapy', url: '/therapy', icon: MessageCircle },
     { name: 'Journal', url: '/journal', icon: Book },
-    { name: 'Habit Tracker', url: '/habits', icon: Repeat },
-    { name: 'Focus Timer', url: '/timer', icon: Timer },
+    { name: 'Habits', url: '/habits', icon: Repeat },
+    { name: 'Timer', url: '/timer', icon: Timer },
     { name: 'Settings', url: '/settings', icon: Settings },
   ];
 
@@ -84,7 +84,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </>
       )}
-      <main className={isMobile ? "p-4 pb-24" : "ml-28 p-6 pt-16"}>
+      <main className={isMobile ? "p-4 pb-28" : "ml-28 p-6 pt-8"}>
         {children}
       </main>
     </div>

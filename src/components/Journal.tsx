@@ -60,7 +60,7 @@ export function Journal() {
       <Tabs defaultValue="new_entry" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="new_entry">New Entry</TabsTrigger>
-          <TabsTrigger value="saved_entries">Saved Entries ({journalEntries.length})</TabsTrigger>
+          <TabsTrigger value="saved_entries">Saved ({journalEntries.length})</TabsTrigger>
         </TabsList>
         <AnimatePresence mode="wait">
           <TabsContent value="new_entry" asChild>
@@ -78,7 +78,7 @@ export function Journal() {
                 <CardContent className="space-y-4">
                   <Textarea
                     placeholder="Start writing..."
-                    className="min-h-[400px] text-base"
+                    className="min-h-[300px] sm:min-h-[400px] text-base"
                     value={newEntryContent}
                     onChange={(e) => setNewEntryContent(e.target.value)}
                     disabled={isLoading}

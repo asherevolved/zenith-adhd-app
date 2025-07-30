@@ -87,7 +87,7 @@ export function FocusTimer() {
           <Button
             key={m}
             variant={mode === m ? 'secondary' : 'ghost'}
-            className="rounded-full"
+            className="rounded-full px-3 text-xs sm:px-4 sm:text-sm"
             onClick={() => handleModeChange(m)}
           >
             {m}
@@ -96,7 +96,7 @@ export function FocusTimer() {
       </div>
       
       <motion.div 
-        className="relative size-64 md:size-80"
+        className="relative size-60 md:size-80"
         whileHover={{ scale: 1.05 }}
         transition={{ type: 'spring', stiffness: 300 }}
       >
@@ -141,8 +141,8 @@ export function FocusTimer() {
       </motion.div>
       
       <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" className="size-16 rounded-full" onClick={resetTimer}>
-          <RotateCcw />
+        <Button variant="outline" size="icon" className="size-14 rounded-full" onClick={resetTimer}>
+          <RotateCcw className="size-5"/>
         </Button>
         <Button size="icon" className="size-20 rounded-full" onClick={toggleTimer}>
           {isActive ? <Pause className="size-8" /> : <Play className="size-8" />}

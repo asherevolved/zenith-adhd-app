@@ -199,7 +199,7 @@ export function TaskManager() {
        return;
     }
 
-    const newTask: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id'> = {
+    const newTask: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id' | 'is_completed'> = {
       title: newTaskTitle,
       notes: newTaskNotes,
       due_date: format(new Date(), 'yyyy-MM-dd'),
@@ -258,7 +258,7 @@ export function TaskManager() {
             <DialogHeader>
               <DialogTitle>Create a new task</DialogTitle>
             </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
               {/* Left Column */}
               <div className="space-y-4">
                 <div>
@@ -269,7 +269,7 @@ export function TaskManager() {
                   <Label htmlFor="notes">Notes</Label>
                   <Textarea id="notes" value={newTaskNotes} onChange={(e) => setNewTaskNotes(e.target.value)} placeholder="Add details..." className="mt-1" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                        <Label htmlFor="priority">Priority</Label>
                        <Select value={newTaskPriority} onValueChange={(v) => setNewTaskPriority(v as Task['priority'])}>
