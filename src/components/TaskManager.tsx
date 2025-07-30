@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -158,16 +157,24 @@ export function TaskManager() {
     }
   }, []);
 
-  const requestNotificationPermission = () => {
-    if ('Notification' in window) {
-      Notification.requestPermission().then(permission => {
-        setNotificationPermission(permission);
-        if (permission === 'granted') {
-          toast({ title: 'Notifications enabled!', description: 'You will now receive task reminders.' });
-        } else {
-          toast({ title: 'Notifications blocked', description: 'To receive reminders, enable notifications in your browser settings.', variant: 'destructive' });
-        }
-      });
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+        toast({ title: "Not Supported", description: "This browser does not support desktop notifications.", variant: "destructive" });
+        return;
+    }
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        toast({ title: "Not Supported", description: "Push notifications are not supported in this browser.", variant: "destructive" });
+        return;
+    }
+
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+
+    if (permission === 'granted') {
+        toast({ title: 'Notifications enabled!', description: 'You will now receive task reminders.' });
+        // The service worker registration and subscription is handled in AppContext
+    } else {
+        toast({ title: 'Notifications blocked', description: 'To receive reminders, enable notifications in your browser settings.', variant: 'destructive' });
     }
   };
 

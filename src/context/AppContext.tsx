@@ -1,10 +1,8 @@
-
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import type { Task, Habit, JournalEntry, UserSettings, Profile, ChatMessage } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { format, subDays, parseISO, subMinutes } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import type { User } from '@supabase/supabase-js';
 import { therapyChat, type TherapyChatInput } from '@/ai/flows/therapy-chat';
@@ -40,31 +38,17 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const scheduleNotification = (task: Task) => {
-  if (!task.reminder || !('Notification' in window) || Notification.permission !== 'granted') {
-    return;
+// Helper function to convert a VAPID public key to a Uint8Array
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
   }
-
-  const dueDate = parseISO(task.due_date + 'T23:59:59'); // Assume end of day
-  const notificationTime = subMinutes(dueDate, task.reminder);
-  const now = new Date();
-
-  if (notificationTime > now) {
-    const delay = notificationTime.getTime() - now.getTime();
-    const timeoutId = setTimeout(() => {
-      new Notification(`Task Reminder: ${task.title}`, {
-        body: task.notes || 'This task is due soon!',
-        icon: '/favicon.ico'
-      });
-    }, delay);
-    return timeoutId;
-  }
-  return null;
-};
-
-const clearNotification = (timeoutId: number) => {
-    clearTimeout(timeoutId);
-};
+  return outputArray;
+}
 
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
@@ -79,26 +63,117 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | undefined>(undefined);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [isLoadingTherapyHistory, setIsLoadingTherapyHistory] = useState(true);
-  const notificationTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  
+  const subscribeToPushNotifications = useCallback(async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.warn('Push notifications are not supported in this browser.');
+      return;
+    }
 
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
 
-  useEffect(() => {
-    // Clear all timeouts on component unmount
-    return () => {
-        notificationTimeouts.current.forEach(clearNotification);
-    };
+      if (subscription) {
+        // Already subscribed, maybe just ensure it's on our server
+        await supabase.from('push_subscriptions').upsert({
+          subscription_payload: subscription.toJSON(),
+        }, { onConflict: 'endpoint' });
+        return;
+      }
+
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        console.error('VAPID public key is not defined.');
+        return;
+      }
+
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
+
+      // Save subscription to the database
+      const { error } = await supabase.from('push_subscriptions').insert({
+        subscription_payload: subscription.toJSON(),
+      });
+      if (error) {
+        console.error('Error saving push subscription:', error);
+        // Don't leave user subscribed if we can't save it
+        await subscription.unsubscribe();
+      } else {
+        console.log('User subscribed to push notifications.');
+      }
+    } catch (error) {
+      console.error('Failed to subscribe to push notifications:', error);
+    }
   }, []);
 
   useEffect(() => {
-    tasks.forEach(task => {
-        if (!task.isCompleted && task.reminder && !notificationTimeouts.current.has(task.id)) {
-            const timeoutId = scheduleNotification(task);
-            if(timeoutId) {
-                notificationTimeouts.current.set(task.id, timeoutId as unknown as NodeJS.Timeout);
-            }
-        }
-    });
-  }, [tasks])
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((registration) => {
+          console.log('Service Worker registered with scope:', registration.scope);
+          // Check notification permission and subscribe if granted
+          if (Notification.permission === 'granted') {
+            subscribeToPushNotifications();
+          }
+        })
+        .catch((error) => {
+          console.error('Service Worker registration failed:', error);
+        });
+    }
+  }, [subscribeToPushNotifications]);
+
+
+  const loadUserData = useCallback(async (userId: string) => {
+    setIsLoadingSettings(true);
+    setIsLoadingTherapyHistory(true);
+
+    try {
+      const [
+        tasksRes,
+        habitsRes,
+        journalRes,
+        settingsRes,
+        profileRes,
+        therapyRes
+      ] = await Promise.all([
+        supabase.from('tasks').select('*, is_completed').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('user_settings').select('*').eq('id', userId).single(),
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('therapy_chat_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
+      ]);
+      
+      if (tasksRes.error) throw new Error(`Tasks: ${tasksRes.error.message}`);
+      setTasks((tasksRes.data || []).map(t => ({...t, isCompleted: t.is_completed})));
+      
+      if (habitsRes.error) throw new Error(`Habits: ${habitsRes.error.message}`);
+      setHabits(habitsRes.data || []);
+      
+      if (journalRes.error) throw new Error(`Journal: ${journalRes.error.message}`);
+      setJournalEntries(journalRes.data || []);
+      
+      if (settingsRes.error && settingsRes.error.code !== 'PGRST116') throw new Error(`Settings: ${settingsRes.error.message}`);
+      setSettings(settingsRes.data || null);
+      
+      if (profileRes.error && profileRes.error.code !== 'PGRST116') throw new Error(`Profile: ${profileRes.error.message}`);
+      setProfile(profileRes.data || null);
+
+      if (therapyRes.error) throw new Error(`Therapy: ${therapyRes.error.message}`);
+      setTherapyMessages(therapyRes.data || []);
+
+    } catch (error: any) {
+        console.error("Failed to load user data from Supabase", error.message);
+        toast({ title: 'Error Loading Data', description: 'Could not load your data. Some features might be unavailable.', variant: 'destructive' });
+    } finally {
+      setIsLoadingSettings(false);
+      setIsLoadingTherapyHistory(false);
+    }
+  }, [toast]);
 
 
   useEffect(() => {
@@ -109,8 +184,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setIsAuthenticated(!!currentUser);
         if (currentUser) {
           await loadUserData(currentUser.id);
+          // When user logs in, ensure we have push subscription if permission is granted
+          if (Notification.permission === 'granted') {
+             subscribeToPushNotifications();
+          }
         } else {
-          // Clear data on logout
           setTasks([]);
           setHabits([]);
           setJournalEntries([]);
@@ -119,8 +197,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           setTherapyMessages([]);
           setIsLoadingSettings(false);
           setIsLoadingTherapyHistory(false);
-          notificationTimeouts.current.forEach(clearNotification);
-          notificationTimeouts.current.clear();
         }
       }
     );
@@ -134,15 +210,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setIsAuthenticated(!!currentUser);
         if (currentUser) {
           await loadUserData(currentUser.id);
+        } else {
+           setIsAuthenticated(false);
+           setIsLoadingSettings(false);
+           setIsLoadingTherapyHistory(false);
         }
       } catch (error) {
         console.error("Error checking user session:", error);
         setIsAuthenticated(false);
-      } finally {
-        // This ensures the app renders even if there's no user initially
-        if (isAuthenticated === undefined) {
-             setIsAuthenticated(!!user);
-        }
+        setIsLoadingSettings(false);
+        setIsLoadingTherapyHistory(false);
       }
     };
     checkUser();
@@ -150,55 +227,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [loadUserData, subscribeToPushNotifications]);
 
-  const loadUserData = async (userId: string) => {
-    
-    // Reset loading states
-    setIsLoadingSettings(true);
-    setIsLoadingTherapyHistory(true);
-
-    try {
-        // Fetch tasks
-        const { data: tasksData, error: tasksError } = await supabase.from('tasks').select('*, is_completed').eq('user_id', userId).order('created_at', { ascending: false });
-        if (tasksError) throw new Error(`Tasks: ${tasksError.message}`);
-        setTasks((tasksData || []).map(t => ({...t, isCompleted: t.is_completed})));
-        
-        // Fetch habits
-        const { data: habitsData, error: habitsError } = await supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-        if (habitsError) throw new Error(`Habits: ${habitsError.message}`);
-        setHabits(habitsData || []);
-
-        // Fetch journal entries
-        const { data: journalData, error: journalError } = await supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-        if (journalError) throw new Error(`Journal: ${journalError.message}`);
-        setJournalEntries(journalData || []);
-        
-        // Fetch settings - okay if not found for new users
-        const { data: settingsData, error: settingsError } = await supabase.from('user_settings').select('*').eq('id', userId).single();
-        if (settingsError && settingsError.code !== 'PGRST116') throw new Error(`Settings: ${settingsError.message}`);
-        setSettings(settingsData || null);
-        setIsLoadingSettings(false);
-
-        // Fetch profile - okay if not found for new users
-        const { data: profileData, error: profileError } = await supabase.from('profiles').select('*').eq('id', userId).single();
-        if (profileError && profileError.code !== 'PGRST116') throw new Error(`Profile: ${profileError.message}`);
-        setProfile(profileData || null);
-        
-        // Fetch therapy messages
-        const { data: therapyData, error: therapyError } = await supabase.from('therapy_chat_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true });
-        if (therapyError) throw new Error(`Therapy: ${therapyError.message}`);
-        setTherapyMessages(therapyData || []);
-        setIsLoadingTherapyHistory(false);
-
-    } catch (error: any) {
-        console.error("Failed to load user data from Supabase", error.message);
-        toast({ title: 'Error Loading Data', description: 'Could not load all your data. Some features might be unavailable.', variant: 'destructive' });
-        // Set loading states to false even on error to unblock UI
-        setIsLoadingSettings(false);
-        setIsLoadingTherapyHistory(false);
-    }
-  }
 
   const login = async (email: string, pass: string): Promise<boolean> => {
     const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
@@ -220,6 +250,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+        // Remove from DB
+        await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
+        // Unsubscribe from push service
+        await subscription.unsubscribe();
+        console.log('Unsubscribed from push notifications.');
+      }
+    }
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
@@ -233,7 +274,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ...task,
       user_id: user.id,
       is_completed: false,
-      due_date: task.due_date,
     };
     const { data, error } = await supabase.from('tasks').insert(newTask).select('*, is_completed').single();
     if (error) {
@@ -245,11 +285,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteTask = async (id: string) => {
-    const timeoutId = notificationTimeouts.current.get(id);
-    if(timeoutId) {
-        clearNotification(timeoutId as unknown as number);
-        notificationTimeouts.current.delete(id);
-    }
     const { error } = await supabase.from('tasks').delete().eq('id', id);
     if (error) {
         toast({ title: 'Error deleting task', description: error.message, variant: 'destructive' });
@@ -262,14 +297,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const toggleTaskCompletion = async (id: string, isCompleted: boolean) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
-
-    if (isCompleted) {
-        const timeoutId = notificationTimeouts.current.get(id);
-        if(timeoutId) {
-            clearNotification(timeoutId as unknown as number);
-            notificationTimeouts.current.delete(id);
-        }
-    }
 
     const newSubtasks = task.subtasks.map(st => ({...st, isCompleted }));
 
@@ -295,14 +322,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         st.id === subtaskId ? { ...st, isCompleted } : st
     );
     const allSubtasksCompleted = updatedSubtasks.every(st => st.isCompleted);
-
-    if (allSubtasksCompleted) {
-        const timeoutId = notificationTimeouts.current.get(taskId);
-        if(timeoutId) {
-            clearNotification(timeoutId as unknown as number);
-            notificationTimeouts.current.delete(taskId);
-        }
-    }
 
     const { data, error } = await supabase
         .from('tasks')
@@ -350,13 +369,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     let currentStreak = 0;
     let tempDate = new Date();
     
-    if (!completions[format(tempDate, 'yyyy-MM-dd')]) {
-      tempDate = subDays(tempDate, 1);
+    if (!completions[new Date().toISOString().slice(0,10)]) {
+      tempDate = new Date(tempDate.setDate(tempDate.getDate() - 1));
     }
 
-    while (completions[format(tempDate, 'yyyy-MM-dd')]) {
+    while (completions[tempDate.toISOString().slice(0,10)]) {
       currentStreak++;
-      tempDate = subDays(tempDate, 1);
+      tempDate = new Date(tempDate.setDate(tempDate.getDate() - 1));
     }
 
     return currentStreak;
@@ -441,8 +460,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       created_at: new Date().toISOString(),
     };
 
-    const currentMessages = [...therapyMessages, userMessage];
-    setTherapyMessages(currentMessages);
+    setTherapyMessages(prev => [...prev, userMessage]);
 
     try {
       // Don't wait for this to complete to improve latency
@@ -454,7 +472,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if(error) console.error("Error saving user message", error);
       });
 
-      const chatHistoryForAi = currentMessages.slice(-10);
+      const chatHistoryForAi = [...therapyMessages, userMessage].slice(-10);
 
       const chatInput: TherapyChatInput = {
         message: messageContent,
