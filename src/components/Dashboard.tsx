@@ -24,7 +24,7 @@ import {
   ChartTooltipContent,
   ChartConfig
 } from '@/components/ui/chart';
-import { CheckCircle2, Target, Trophy, Sparkles } from 'lucide-react';
+import { CheckCircle2, Target, Trophy, Sparkles, BookHeart, PieChart, Star } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { eachDayOfInterval, startOfWeek, endOfWeek, format } from 'date-fns';
 import { Skeleton } from './ui/skeleton';
@@ -64,9 +64,12 @@ const itemVariants = {
 
 
 export function Dashboard() {
-  const { tasks, habits, profile, isLoadingSettings } = useAppContext();
+  const { tasks, habits, profile, journalEntries, isLoadingSettings } = useAppContext();
 
   const tasksCompleted = tasks.filter(t => t.isCompleted).length;
+  const totalTasks = tasks.length;
+  const taskCompletionRate = totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0;
+  
   const activeHabits = habits.length;
   
   const longestHabitStreak = React.useMemo(() => {
@@ -75,6 +78,9 @@ export function Dashboard() {
       return Math.max(maxStreak, habit.streak);
     }, 0);
   }, [habits]);
+
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const habitsCompletedToday = habits.filter(h => h.completions[todayStr]).length;
 
   const weeklyProgress = React.useMemo(() => {
     const today = new Date();
@@ -97,7 +103,7 @@ export function Dashboard() {
   // A simple way to calculate "badges" or achievements
   const badgesUnlocked = Math.floor(tasksCompleted / 5) + Math.floor(longestHabitStreak / 7);
 
-  if (isLoadingSettings || !tasks || !habits) {
+  if (isLoadingSettings || !tasks || !habits || !profile || !journalEntries) {
      return (
         <div className="space-y-6">
             <div className="space-y-2">
@@ -105,6 +111,10 @@ export function Dashboard() {
                 <Skeleton className="h-4 w-1/3" />
             </div>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
                 <Skeleton className="h-32 w-full" />
                 <Skeleton className="h-32 w-full" />
                 <Skeleton className="h-32 w-full" />
@@ -184,6 +194,42 @@ export function Dashboard() {
             <CardContent>
               <div className="text-2xl font-bold">{badgesUnlocked}</div>
               <p className="text-xs text-muted-foreground">badges unlocked</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <motion.div variants={itemVariants}>
+           <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Journal Entries</CardTitle>
+              <BookHeart className="size-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{journalEntries.length}</div>
+              <p className="text-xs text-muted-foreground">total entries</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <motion.div variants={itemVariants}>
+           <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Task Completion</CardTitle>
+              <PieChart className="size-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{taskCompletionRate}%</div>
+              <p className="text-xs text-muted-foreground">overall completion rate</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <motion.div variants={itemVariants}>
+           <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Habits Done Today</CardTitle>
+              <Star className="size-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{habitsCompletedToday}</div>
+              <p className="text-xs text-muted-foreground">of {activeHabits} habits</p>
             </CardContent>
           </Card>
         </motion.div>
