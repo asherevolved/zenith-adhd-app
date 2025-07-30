@@ -10,7 +10,7 @@ import type { User } from '@supabase/supabase-js';
 
 interface AppContextType {
   // Auth state
-  isAuthenticated: boolean;
+  isAuthenticated: boolean | undefined;
   user: User | null;
   profile: Profile | null;
   login: (email: string, pass: string) => Promise<boolean>;
@@ -43,7 +43,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | undefined>(undefined);
   const [isMounted, setIsMounted] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
@@ -73,6 +73,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setUser(session.user);
         setIsAuthenticated(true);
         await loadUserData(session.user.id);
+      } else {
+        setIsAuthenticated(false);
       }
       setIsMounted(true);
     };
