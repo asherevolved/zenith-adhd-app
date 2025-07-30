@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { AppLayout } from '@/components/AppLayout';
@@ -6,7 +7,7 @@ import { Squares } from '@/components/ui/squares-background';
 import { AppProvider } from '@/context/AppContext';
 
 export const metadata: Metadata = {
-  title: 'Mindful Me',
+  title: 'Zenith',
   description: 'A web-based ADHD productivity and wellness platform.',
 };
 

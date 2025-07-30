@@ -1,11 +1,24 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Task, Subtask, Habit, JournalEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { differenceInDays, format, subDays } from 'date-fns';
+import { format, subDays } from 'date-fns';
+
+// Mock user type
+type User = {
+  email: string;
+};
 
 interface AppContextType {
+  // Auth state
+  isAuthenticated: boolean;
+  user: User | null;
+  login: (email: string, pass: string) => boolean;
+  signup: (email: string, pass: string) => boolean;
+  logout: () => void;
+  // App state
   tasks: Task[];
   habits: Habit[];
   journalEntries: JournalEntry[];
@@ -21,38 +34,122 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// In a real app, this would be in a database
+const MOCK_USERS = 'mock_users';
+
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-
+  
   // Load state from localStorage on mount
   useEffect(() => {
     try {
-      const storedTasks = localStorage.getItem('tasks');
-      if (storedTasks) setTasks(JSON.parse(storedTasks));
-
-      const storedHabits = localStorage.getItem('habits');
-      if (storedHabits) setHabits(JSON.parse(storedHabits));
-
-      const storedJournal = localStorage.getItem('journal');
-      if (storedJournal) setJournalEntries(JSON.parse(storedJournal));
+      // Auth state
+      const storedUser = localStorage.getItem('currentUser');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+        loadUserData(parsedUser.email);
+      }
     } catch (error) {
-      console.error("Failed to parse from localStorage", error);
+      console.error("Failed to parse auth state from localStorage", error);
     }
     setIsMounted(true);
   }, []);
   
+  const getStorageKey = (key: string, email?: string) => {
+    const userEmail = email || user?.email;
+    if (!userEmail) return null;
+    return `${userEmail}_${key}`;
+  }
+
+  const loadUserData = (email: string) => {
+     try {
+      const tasksKey = getStorageKey('tasks', email);
+      const habitsKey = getStorageKey('habits', email);
+      const journalKey = getStorageKey('journal', email);
+
+      if (tasksKey) {
+        const storedTasks = localStorage.getItem(tasksKey);
+        if (storedTasks) setTasks(JSON.parse(storedTasks));
+        else setTasks([]);
+      }
+      if (habitsKey) {
+        const storedHabits = localStorage.getItem(habitsKey);
+        if (storedHabits) setHabits(JSON.parse(storedHabits));
+        else setHabits([]);
+      }
+      if (journalKey) {
+        const storedJournal = localStorage.getItem(journalKey);
+        if (storedJournal) setJournalEntries(JSON.parse(storedJournal));
+        else setJournalEntries([]);
+      }
+    } catch (error) {
+        console.error("Failed to load user data from localStorage", error);
+        setTasks([]);
+        setHabits([]);
+        setJournalEntries([]);
+    }
+  }
+
   // Save state to localStorage whenever it changes
   useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('tasks', JSON.stringify(tasks));
-      localStorage.setItem('habits', JSON.stringify(habits));
-      localStorage.setItem('journal', JSON.stringify(journalEntries));
+    if (isMounted && isAuthenticated && user) {
+      const tasksKey = getStorageKey('tasks');
+      const habitsKey = getStorageKey('habits');
+      const journalKey = getStorageKey('journal');
+
+      if (tasksKey) localStorage.setItem(tasksKey, JSON.stringify(tasks));
+      if (habitsKey) localStorage.setItem(habitsKey, JSON.stringify(habits));
+      if (journalKey) localStorage.setItem(journalKey, JSON.stringify(journalEntries));
     }
-  }, [tasks, habits, journalEntries, isMounted]);
+  }, [tasks, habits, journalEntries, user, isAuthenticated, isMounted]);
+
+  const login = (email: string, pass: string): boolean => {
+    const users = JSON.parse(localStorage.getItem(MOCK_USERS) || '{}');
+    if (users[email] && users[email] === pass) {
+      const loggedInUser = { email };
+      localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
+      setUser(loggedInUser);
+      setIsAuthenticated(true);
+      loadUserData(email);
+      return true;
+    }
+    return false;
+  };
+
+  const signup = (email: string, pass: string): boolean => {
+    const users = JSON.parse(localStorage.getItem(MOCK_USERS) || '{}');
+    if (users[email]) {
+      return false; // User already exists
+    }
+    users[email] = pass;
+    localStorage.setItem(MOCK_USERS, JSON.stringify(users));
+    
+    // Automatically log in after signup
+    const loggedInUser = { email };
+    localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
+    setUser(loggedInUser);
+    setIsAuthenticated(true);
+    loadUserData(email);
+    return true;
+  };
+
+  const logout = () => {
+    localStorage.removeItem('currentUser');
+    setUser(null);
+    setIsAuthenticated(false);
+    setTasks([]);
+    setHabits([]);
+    setJournalEntries([]);
+    toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+  };
   
   const addTask = (task: Omit<Task, 'id' | 'isCompleted' | 'created_at'>) => {
     const newTask: Task = {
@@ -106,42 +203,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const calculateStreak = (completions: Record<string, boolean>): number => {
-    let streak = 0;
-    const today = new Date();
-    let currentDate = today;
-
-    // Check today
-    if (completions[format(currentDate, 'yyyy-MM-dd')]) {
-        streak++;
-        currentDate = subDays(currentDate, 1);
-    } else {
-        // if today is not completed, check if yesterday was. If so, streak is 0.
-        // If not, maybe they just haven't done it today.
-        const yesterday = subDays(today, 1);
-        if(completions[format(yesterday, 'yyyy-MM-dd')]) {
-            // They had a streak but missed today
-        } else {
-           // They didn't have a streak anyway
-           currentDate = yesterday;
-        }
-    }
-
-    while (completions[format(currentDate, 'yyyy-MM-dd')]) {
-        streak++;
-        currentDate = subDays(currentDate, 1);
-    }
-    
-    // Final check for today's completion if streak was broken
-    if (!completions[format(today, 'yyyy-MM-dd')]) {
-        const yesterday = format(subDays(today, 1), 'yyyy-MM-dd');
-        if (completions[yesterday]) {
-            // streak was active until today
-        } else {
-            // no active streak
-        }
-    }
-    
-    // A simpler version:
     let currentStreak = 0;
     let tempDate = new Date();
     
@@ -184,6 +245,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const value = {
+    isAuthenticated,
+    user,
+    login,
+    signup,
+    logout,
     tasks,
     habits,
     journalEntries,
