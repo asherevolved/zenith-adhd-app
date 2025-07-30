@@ -61,5 +61,3 @@ export type UserSettings = {
   journal_retention: '7' | '30' | 'Forever';
   enable_motion: boolean;
 };
-
-    

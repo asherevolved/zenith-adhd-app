@@ -2,11 +2,12 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
-import type { Task, Habit, JournalEntry, UserSettings, Profile } from '@/types';
+import type { Task, Habit, JournalEntry, UserSettings, Profile, ChatMessage } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, subDays, parseISO, subMinutes } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import type { User } from '@supabase/supabase-js';
+import { therapyChat, type TherapyChatInput } from '@/ai/flows/therapy-chat';
 
 interface AppContextType {
   // Auth state
@@ -21,7 +22,9 @@ interface AppContextType {
   habits: Habit[];
   journalEntries: JournalEntry[];
   settings: UserSettings | null;
+  therapyMessages: ChatMessage[];
   isLoadingSettings: boolean;
+  isLoadingTherapyHistory: boolean;
   addTask: (task: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id'>) => void;
   deleteTask: (id: string) => void;
   toggleTaskCompletion: (id: string, isCompleted: boolean) => void;
@@ -31,6 +34,7 @@ interface AppContextType {
   deleteHabit: (habitId: string) => void;
   addJournalEntry: (content: string) => void;
   updateSettings: (newSettings: UserSettings) => Promise<void>;
+  sendTherapyMessage: (message: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -68,11 +72,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [therapyMessages, setTherapyMessages] = useState<ChatMessage[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | undefined>(undefined);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [isLoadingTherapyHistory, setIsLoadingTherapyHistory] = useState(true);
   const notificationTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
 
@@ -110,6 +116,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           setJournalEntries([]);
           setSettings(null);
           setProfile(null);
+          setTherapyMessages([]);
           setIsLoadingData(false);
           notificationTimeouts.current.forEach(clearNotification);
           notificationTimeouts.current.clear();
@@ -144,18 +151,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const loadUserData = async (userId: string) => {
     setIsLoadingData(true);
     setIsLoadingSettings(true);
+    setIsLoadingTherapyHistory(true);
     try {
-      const [tasksData, habitsData, journalData, settingsData, profileData] = await Promise.all([
+      const [tasksData, habitsData, journalData, settingsData, profileData, therapyData] = await Promise.all([
         supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('user_settings').select('*').eq('id', userId).single(),
         supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('therapy_chat_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
       ]);
 
       if (tasksData.error) throw tasksData.error;
       if (habitsData.error) throw habitsData.error;
       if (journalData.error) throw journalData.error;
+      if (therapyData.error) throw therapyData.error;
       // It's okay if settings or profile are not found initially for a new user
       if (settingsData.error && settingsData.status !== 406) throw settingsData.error;
       if (profileData.error && profileData.status !== 406) throw profileData.error;
@@ -164,6 +174,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setTasks(tasksData.data || []);
       setHabits(habitsData.data || []);
       setJournalEntries(journalData.data || []);
+      setTherapyMessages(therapyData.data || []);
       setSettings(settingsData.data || null);
       setProfile(profileData.data || null);
 
@@ -173,6 +184,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoadingData(false);
       setIsLoadingSettings(false);
+      setIsLoadingTherapyHistory(false);
     }
   }
 
@@ -395,6 +407,57 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const sendTherapyMessage = async (messageContent: string) => {
+    if (!user) return;
+
+    const optimisticUserMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        role: 'user',
+        content: messageContent,
+        created_at: new Date().toISOString(),
+    };
+
+    setTherapyMessages(prev => [...prev, optimisticUserMessage]);
+
+    try {
+        const { error: userError } = await supabase.from('therapy_chat_messages').insert({
+            user_id: user.id,
+            role: 'user',
+            content: messageContent,
+        });
+        if (userError) throw userError;
+
+        const chatHistoryForAi = [...therapyMessages, optimisticUserMessage].slice(-10);
+
+        const chatInput: TherapyChatInput = {
+            message: messageContent,
+            chatHistory: chatHistoryForAi.map(m => ({ role: m.role, content: m.content }))
+        };
+
+        const result = await therapyChat(chatInput);
+        const assistantMessageContent = result.response;
+
+        const { data: assistantData, error: assistantError } = await supabase.from('therapy_chat_messages').insert({
+            user_id: user.id,
+            role: 'assistant',
+            content: assistantMessageContent,
+        }).select().single();
+
+        if (assistantError) throw assistantError;
+
+        setTherapyMessages(prev => {
+            const newMessages = prev.filter(m => m.id !== optimisticUserMessage.id);
+            return [...newMessages, assistantData];
+        });
+
+    } catch (error) {
+        console.error("Error sending therapy message:", error);
+        setTherapyMessages(prev => prev.filter(m => m.id !== optimisticUserMessage.id));
+        toast({ title: "An error occurred", description: "Could not send message. Please try again.", variant: 'destructive' });
+    }
+  }
+
   const value = {
     isAuthenticated,
     user,
@@ -406,7 +469,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     habits,
     journalEntries,
     settings,
+    therapyMessages,
     isLoadingSettings: isLoadingData || isLoadingSettings,
+    isLoadingTherapyHistory,
     addTask,
     deleteTask,
     toggleTaskCompletion,
@@ -416,6 +481,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     deleteHabit,
     addJournalEntry,
     updateSettings,
+    sendTherapyMessage,
   };
   
   if (isLoadingData) return null;
@@ -430,5 +496,3 @@ export const useAppContext = () => {
   }
   return context;
 };
-
-    

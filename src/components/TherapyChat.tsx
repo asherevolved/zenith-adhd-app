@@ -9,42 +9,15 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { therapyChat, type TherapyChatInput } from '@/ai/flows/therapy-chat';
 import { Skeleton } from './ui/skeleton';
 import { useAppContext } from '@/context/AppContext';
-import { supabase } from '@/lib/supabaseClient';
 import type { ChatMessage } from '@/types';
 
 export function TherapyChat() {
-  const [messages, setMessages] = React.useState<ChatMessage[]>([]);
+  const { therapyMessages, sendTherapyMessage, isLoadingTherapyHistory } = useAppContext();
   const [input, setInput] = React.useState('');
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [isLoadingHistory, setIsLoadingHistory] = React.useState(true);
+  const [isSending, setIsSending] = React.useState(false);
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
-  const { user } = useAppContext();
-
-  React.useEffect(() => {
-    const fetchChatHistory = async () => {
-      if (!user) return;
-      setIsLoadingHistory(true);
-      const { data, error } = await supabase
-        .from('therapy_chat_messages')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
-      
-      if (error) {
-        console.error('Error fetching chat history:', error);
-      } else {
-        setMessages(data);
-      }
-      setIsLoadingHistory(false);
-    };
-
-    if(user) {
-      fetchChatHistory();
-    }
-  }, [user]);
 
   React.useEffect(() => {
     // Scroll to bottom when new messages are added
@@ -52,73 +25,21 @@ export function TherapyChat() {
       if (scrollAreaRef.current) {
         const viewport = scrollAreaRef.current.querySelector('div[data-radix-scroll-area-viewport]');
         if (viewport) {
-            viewport.scrollTop = viewport.scrollHeight;
+          viewport.scrollTop = viewport.scrollHeight;
         }
       }
     }, 100);
-  }, [messages]);
+  }, [therapyMessages]);
 
   const handleSendMessage = async () => {
-    if (!input.trim() || !user) return;
+    if (!input.trim()) return;
 
-    const userMessageContent = input;
+    setIsSending(true);
+    const messageContent = input;
     setInput('');
-
-    // Optimistically add user message to UI
-    const optimisticUserMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      role: 'user',
-      content: userMessageContent,
-      created_at: new Date().toISOString(),
-    };
-    setMessages(prev => [...prev, optimisticUserMessage]);
-    setIsLoading(true);
-
-    try {
-       // Save user message to DB
-      const { error: userError } = await supabase.from('therapy_chat_messages').insert({
-          user_id: user.id,
-          role: 'user',
-          content: userMessageContent,
-      });
-      if (userError) throw userError;
-      
-      const chatHistory = messages.slice(-5);
-      const chatInput: TherapyChatInput = { 
-        message: userMessageContent, 
-        chatHistory: chatHistory.map(m => ({role: m.role, content: m.content}))
-      };
-
-      const result = await therapyChat(chatInput);
-      const assistantMessageContent = result.response;
-      
-      // Save assistant message to DB
-      const { data: assistantData, error: assistantError } = await supabase.from('therapy_chat_messages').insert({
-          user_id: user.id,
-          role: 'assistant',
-          content: assistantMessageContent,
-      }).select().single();
-
-      if (assistantError) throw assistantError;
-
-      // Update the user message list with the response from the database
-      setMessages(prev => [...prev.filter(m => m.id !== optimisticUserMessage.id), assistantData]);
-
-
-    } catch (error) {
-      console.error(error);
-      const errorMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        role: 'assistant',
-        content: "Sorry, I'm having trouble connecting right now.",
-        created_at: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
+    
+    await sendTherapyMessage(messageContent);
+    setIsSending(false);
   };
   
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -126,13 +47,15 @@ export function TherapyChat() {
       handleSendMessage();
     }
   };
+  
+  const isLoading = isLoadingTherapyHistory || isSending;
 
   return (
     <div className="flex h-[calc(100vh-10rem)] md:h-[calc(100vh-8rem)] flex-col">
       <ScrollArea className="flex-1" ref={scrollAreaRef}>
         <div className="space-y-6 p-4">
         <AnimatePresence initial={false}>
-          {isLoadingHistory ? (
+          {isLoadingTherapyHistory ? (
              <motion.div 
                 className="flex items-start gap-3 justify-start"
                 initial={{ opacity: 0, y: 20 }}
@@ -144,11 +67,10 @@ export function TherapyChat() {
                 <div className="max-w-xs rounded-2xl p-3 text-sm md:max-w-md rounded-bl-none bg-card space-y-2">
                     <Skeleton className="h-4 w-[250px]" />
                     <Skeleton className="h-4 w-[200px]" />
-                    <p className="text-xs text-muted-foreground">Loading history...</p>
                 </div>
             </motion.div>
           ) : (
-            messages.map((message) => (
+            therapyMessages.map((message) => (
               <motion.div
                 key={message.id}
                 layout
@@ -180,7 +102,7 @@ export function TherapyChat() {
               </motion.div>
             ))
           )}
-          {isLoading && (
+          {isSending && (
              <motion.div 
                 key="loading"
                 layout
@@ -193,7 +115,11 @@ export function TherapyChat() {
                     <AvatarFallback><Bot className="size-4" /></AvatarFallback>
                 </Avatar>
                 <div className="max-w-xs rounded-2xl p-3 text-sm md:max-w-md rounded-bl-none bg-card space-y-2">
-                    <Skeleton className="h-4 w-10 animate-pulse" />
+                    <div className="flex items-center gap-1.5">
+                        <motion.div className="size-2 rounded-full bg-muted-foreground animate-pulse" style={{ animationDelay: '0s' }} />
+                        <motion.div className="size-2 rounded-full bg-muted-foreground animate-pulse" style={{ animationDelay: '0.2s' }} />
+                        <motion.div className="size-2 rounded-full bg-muted-foreground animate-pulse" style={{ animationDelay: '0.4s' }} />
+                    </div>
                 </div>
             </motion.div>
           )}
@@ -205,15 +131,15 @@ export function TherapyChat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type your message or use the microphone..."
+          placeholder="Type your message..."
           className="h-12 border-0 bg-transparent pr-24 focus-visible:ring-0"
-          disabled={isLoading || isLoadingHistory}
+          disabled={isLoading}
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          <Button variant="ghost" size="icon" disabled={isLoading || isLoadingHistory}>
+          <Button variant="ghost" size="icon" disabled={isLoading}>
             <Mic className="size-5" />
           </Button>
-          <Button size="icon" onClick={handleSendMessage} disabled={isLoading || isLoadingHistory || !input.trim()}>
+          <Button size="icon" onClick={handleSendMessage} disabled={isLoading || !input.trim()}>
             <CornerDownLeft className="size-5" />
           </Button>
         </div>
