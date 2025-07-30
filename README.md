@@ -31,7 +31,7 @@ To deploy your application to Vercel, follow these steps:
 3.  **Configure Environment Variables**:
     *   During the import process, Vercel will ask you to configure your project.
     *   Go to the **Environment Variables** section.
-    *   Add the following variables from your `.env` file:
+    *   Add the following variables. You can get these values from your Supabase project settings.
         *   `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
         *   `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase project anon key.
 
