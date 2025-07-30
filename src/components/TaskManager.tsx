@@ -84,7 +84,7 @@ function TaskItem({ task, index }: { task: Task, index: number }) {
               {task.title}
             </label>
              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>Due: {format(new Date(task.dueDate), 'PPP')}</span>
+                <span>Due: {format(new Date(task.due_date), 'PPP')}</span>
                 {task.reminder && !task.isCompleted && (
                     <span className="flex items-center gap-1"><Bell className="size-3" /> {task.reminder} min before</span>
                 )}
@@ -202,7 +202,7 @@ export function TaskManager() {
     const newTask: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id'> = {
       title: newTaskTitle,
       notes: newTaskNotes,
-      dueDate: format(new Date(), 'yyyy-MM-dd'),
+      due_date: format(new Date(), 'yyyy-MM-dd'),
       priority: newTaskPriority,
       status: newTaskStatus,
       subtasks: finalSubtasks,
@@ -231,7 +231,7 @@ export function TaskManager() {
   const filteredTasks = (status: Task['status']) => tasks.filter(task => {
      if (status === 'Today') {
         const today = format(new Date(), 'yyyy-MM-dd');
-        return !task.isCompleted && (task.status === 'Today' || task.dueDate === today);
+        return !task.isCompleted && (task.status === 'Today' || task.due_date === today);
      }
       if (status === 'Completed') {
          return task.isCompleted;

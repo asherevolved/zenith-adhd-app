@@ -9,7 +9,7 @@ export type Task = {
   user_id: string;
   title: string;
   notes?: string;
-  dueDate: string;
+  due_date: string;
   priority: 'Urgent' | 'Medium' | 'Low';
   status: 'Today' | 'Upcoming' | 'Someday';
   isCompleted: boolean;

@@ -82,7 +82,7 @@ export function Dashboard() {
 
     return daysOfWeek.map(day => {
       const formattedDay = format(day, 'yyyy-MM-dd');
-      const tasksDone = tasks.filter(t => t.isCompleted && t.dueDate === formattedDay).length;
+      const tasksDone = tasks.filter(t => t.isCompleted && t.due_date === formattedDay).length;
       const habitsDone = habits.filter(h => h.completions[formattedDay]).length;
       return {
         day: format(day, 'E'),

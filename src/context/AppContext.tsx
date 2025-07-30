@@ -40,7 +40,7 @@ const scheduleNotification = (task: Task) => {
     return;
   }
 
-  const dueDate = parseISO(task.dueDate + 'T23:59:59'); // Assume end of day
+  const dueDate = parseISO(task.due_date + 'T23:59:59'); // Assume end of day
   const notificationTime = subMinutes(dueDate, task.reminder);
   const now = new Date();
 
