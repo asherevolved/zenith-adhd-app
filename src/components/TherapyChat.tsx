@@ -1,7 +1,8 @@
+
 'use client';
 
 import * as React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CornerDownLeft, Mic, User, Bot } from 'lucide-react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -19,7 +20,7 @@ export function TherapyChat() {
   const [input, setInput] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = React.useState(true);
-  const scrollAreaRef = React.useRef<React.ElementRef<'div'>>(null);
+  const scrollAreaRef = React.useRef<HTMLDivElement>(null);
   const { user } = useAppContext();
 
   React.useEffect(() => {
@@ -40,17 +41,21 @@ export function TherapyChat() {
       setIsLoadingHistory(false);
     };
 
-    fetchChatHistory();
+    if(user) {
+      fetchChatHistory();
+    }
   }, [user]);
 
   React.useEffect(() => {
     // Scroll to bottom when new messages are added
-    if (scrollAreaRef.current) {
+    setTimeout(() => {
+      if (scrollAreaRef.current) {
         const viewport = scrollAreaRef.current.querySelector('div[data-radix-scroll-area-viewport]');
         if (viewport) {
             viewport.scrollTop = viewport.scrollHeight;
         }
-    }
+      }
+    }, 100);
   }, [messages]);
 
   const handleSendMessage = async () => {
@@ -97,8 +102,9 @@ export function TherapyChat() {
 
       if (assistantError) throw assistantError;
 
-      // Add assistant message to UI from DB response
-      setMessages(prev => [...prev, assistantData]);
+      // Update the user message list with the response from the database
+      setMessages(prev => [...prev.filter(m => m.id !== optimisticUserMessage.id), assistantData]);
+
 
     } catch (error) {
       console.error(error);
@@ -122,11 +128,16 @@ export function TherapyChat() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-10rem)] flex-col">
+    <div className="flex h-[calc(100vh-10rem)] md:h-[calc(100vh-8rem)] flex-col">
       <ScrollArea className="flex-1" ref={scrollAreaRef}>
         <div className="space-y-6 p-4">
+        <AnimatePresence initial={false}>
           {isLoadingHistory ? (
-             <div className="flex items-start gap-3 justify-start">
+             <motion.div 
+                className="flex items-start gap-3 justify-start"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+             >
                 <Avatar className="size-8">
                     <AvatarFallback><Bot className="size-4" /></AvatarFallback>
                 </Avatar>
@@ -135,14 +146,16 @@ export function TherapyChat() {
                     <Skeleton className="h-4 w-[200px]" />
                     <p className="text-xs text-muted-foreground">Loading history...</p>
                 </div>
-            </div>
+            </motion.div>
           ) : (
-            messages.map((message, index) => (
+            messages.map((message) => (
               <motion.div
                 key={message.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
+                layout
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                transition={{ duration: 0.3 }}
                 className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {message.role === 'assistant' && (
@@ -167,17 +180,24 @@ export function TherapyChat() {
               </motion.div>
             ))
           )}
-          {isLoading && !isLoadingHistory && (
-             <div className="flex items-start gap-3 justify-start">
+          {isLoading && (
+             <motion.div 
+                key="loading"
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex items-start gap-3 justify-start"
+             >
                 <Avatar className="size-8">
                     <AvatarFallback><Bot className="size-4" /></AvatarFallback>
                 </Avatar>
                 <div className="max-w-xs rounded-2xl p-3 text-sm md:max-w-md rounded-bl-none bg-card space-y-2">
-                    <Skeleton className="h-4 w-[250px]" />
-                    <Skeleton className="h-4 w-[200px]" />
+                    <Skeleton className="h-4 w-10 animate-pulse" />
                 </div>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
         </div>
       </ScrollArea>
       <div className="relative mt-4 rounded-lg border bg-card/50">

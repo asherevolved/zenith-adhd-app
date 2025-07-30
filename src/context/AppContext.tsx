@@ -44,7 +44,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | undefined>(undefined);
-  const [isMounted, setIsMounted] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   useEffect(() => {
@@ -62,21 +62,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           setJournalEntries([]);
           setSettings(null);
           setProfile(null);
+          setIsLoadingData(false);
         }
       }
     );
 
     // Initial check
     const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        setIsAuthenticated(true);
-        await loadUserData(session.user.id);
-      } else {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        setIsAuthenticated(!!currentUser);
+        if (currentUser) {
+          await loadUserData(currentUser.id);
+        }
+      } catch (error) {
+        console.error("Error checking user session:", error);
         setIsAuthenticated(false);
+      } finally {
+        setIsLoadingData(false);
       }
-      setIsMounted(true);
     };
     checkUser();
 
@@ -86,6 +92,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const loadUserData = async (userId: string) => {
+    setIsLoadingData(true);
     setIsLoadingSettings(true);
     try {
       const [tasksData, habitsData, journalData, settingsData, profileData] = await Promise.all([
@@ -114,6 +121,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to load user data from Supabase", error);
       toast({ title: 'Error', description: 'Could not load your data.', variant: 'destructive' });
     } finally {
+      setIsLoadingData(false);
       setIsLoadingSettings(false);
     }
   }
@@ -140,6 +148,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setProfile(null);
     setIsAuthenticated(false);
     toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
   };
@@ -226,7 +235,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (error) {
         toast({ title: 'Error adding habit', description: error.message, variant: 'destructive' });
     } else if (data) {
-        setHabits(prev => [...prev, data]);
+        setHabits(prev => [data, ...prev]);
         toast({ title: 'Habit Added', description: `You are now tracking "${name}".`})
     }
   };
@@ -326,7 +335,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     habits,
     journalEntries,
     settings,
-    isLoadingSettings,
+    isLoadingSettings: isLoadingData || isLoadingSettings,
     addTask,
     deleteTask,
     toggleTaskCompletion,
@@ -338,8 +347,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     updateSettings,
   };
   
-  // Render children only when mounted to avoid hydration errors with auth state
-  if (!isMounted) return null;
+  if (isLoadingData) return null;
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -5,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, RotateCcw, Waves, CloudRain, Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useAppContext } from '@/context/AppContext';
 
 const modes = {
   '25/5': { focus: 25 * 60, break: 5 * 60 },
@@ -14,11 +16,18 @@ const modes = {
 type Mode = keyof typeof modes;
 
 export function FocusTimer() {
+  const { settings } = useAppContext();
   const [mode, setMode] = React.useState<Mode>('25/5');
   const [isBreak, setIsBreak] = React.useState(false);
   const [timeLeft, setTimeLeft] = React.useState(modes[mode].focus);
   const [isActive, setIsActive] = React.useState(false);
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    if(settings?.default_timer_mode) {
+      setMode(settings.default_timer_mode);
+    }
+  }, [settings]);
 
   React.useEffect(() => {
     setTimeLeft(isBreak ? modes[mode].break : modes[mode].focus);
@@ -42,7 +51,15 @@ export function FocusTimer() {
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [isActive, timeLeft, isBreak, toast]);
+  }, [isActive, timeLeft, isBreak, toast, mode]);
+  
+  const handleModeChange = (newMode: Mode) => {
+    setMode(newMode);
+    setIsActive(false);
+    setIsBreak(false);
+    setTimeLeft(modes[newMode].focus);
+  };
+
 
   const toggleTimer = () => setIsActive(!isActive);
   
@@ -59,21 +76,30 @@ export function FocusTimer() {
   const seconds = timeLeft % 60;
   
   return (
-    <div className="flex flex-col items-center justify-center gap-8 py-8">
+    <motion.div 
+      className="flex flex-col items-center justify-center gap-8 py-8"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
       <div className="flex gap-2 rounded-full bg-card p-1">
         {(Object.keys(modes) as Mode[]).map(m => (
           <Button
             key={m}
-            variant={mode === m ? 'default' : 'ghost'}
+            variant={mode === m ? 'secondary' : 'ghost'}
             className="rounded-full"
-            onClick={() => { setMode(m); setIsActive(false); setIsBreak(false); }}
+            onClick={() => handleModeChange(m)}
           >
             {m}
           </Button>
         ))}
       </div>
       
-      <div className="relative size-64 md:size-80">
+      <motion.div 
+        className="relative size-64 md:size-80"
+        whileHover={{ scale: 1.05 }}
+        transition={{ type: 'spring', stiffness: 300 }}
+      >
         <svg className="size-full -rotate-90" viewBox="0 0 120 120">
           <circle
             cx="60"
@@ -92,8 +118,8 @@ export function FocusTimer() {
             strokeWidth="12"
             strokeLinecap="round"
             pathLength="100"
-            strokeDasharray="100"
-            strokeDashoffset={100 - progress}
+            initial={{ strokeDashoffset: 100 }}
+            animate={{ strokeDashoffset: 100 - progress }}
             transition={{ duration: 1, ease: "linear" }}
           />
         </svg>
@@ -112,7 +138,7 @@ export function FocusTimer() {
             </AnimatePresence>
           <p className="mt-2 text-lg text-muted-foreground">{isBreak ? 'Break' : 'Focus'}</p>
         </div>
-      </div>
+      </motion.div>
       
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" className="size-16 rounded-full" onClick={resetTimer}>
@@ -127,6 +153,6 @@ export function FocusTimer() {
             <Button variant="ghost" size="icon"><Waves /></Button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

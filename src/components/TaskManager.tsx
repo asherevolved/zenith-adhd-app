@@ -2,6 +2,7 @@
 'use client';
 
 import * as React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PlusCircle, MoreVertical, Trash2, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
 import { format } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
 import { useAppContext } from '@/context/AppContext';
 
 const priorityColors = {
@@ -33,18 +33,56 @@ const priorityColors = {
   Low: 'border-green-500/50 text-green-400',
 };
 
-function TaskItem({ task }: { task: Task }) {
+const taskVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: i * 0.05,
+    },
+  }),
+  exit: {
+    opacity: 0,
+    x: -50,
+    transition: {
+      duration: 0.2,
+    }
+  }
+};
+
+
+function TaskItem({ task, index }: { task: Task, index: number }) {
   const { toggleTaskCompletion, deleteTask, toggleSubtaskCompletion } = useAppContext();
   const completedSubtasks = task.subtasks.filter(st => st.isCompleted).length;
   const progress = task.subtasks.length > 0 ? (completedSubtasks / task.subtasks.length) * 100 : (task.isCompleted ? 100 : 0);
 
   return (
-    <div className="bg-transparent transition-all p-4 rounded-lg">
+    <motion.div 
+      className="bg-transparent transition-all p-4 rounded-lg border-b border-border/20"
+      variants={taskVariants}
+      custom={index}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      layout
+    >
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3 flex-1">
-          <Checkbox checked={task.isCompleted} onCheckedChange={(checked) => toggleTaskCompletion(task.id, !!checked)} className="size-5" />
-          <div className={`text-base font-medium ${task.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
-            {task.title}
+        <div className="flex items-center gap-3 flex-1 pt-1">
+          <Checkbox 
+            id={`task-${task.id}`} 
+            checked={task.isCompleted} 
+            onCheckedChange={(checked) => toggleTaskCompletion(task.id, !!checked)} 
+            className="size-5" 
+          />
+          <div className="grid gap-0.5">
+            <label 
+              htmlFor={`task-${task.id}`} 
+              className={`text-base font-medium cursor-pointer ${task.isCompleted ? 'line-through text-muted-foreground' : ''}`}
+            >
+              {task.title}
+            </label>
+            <p className="text-xs text-muted-foreground">Due: {format(new Date(task.dueDate), 'PPP')}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -67,7 +105,6 @@ function TaskItem({ task }: { task: Task }) {
           </DropdownMenu>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground pt-1 pl-8">Due: {format(new Date(task.dueDate), 'PPP')}</p>
       
       {task.subtasks && task.subtasks.length > 0 && (
         <div className="pl-8 mt-4 space-y-3">
@@ -92,13 +129,12 @@ function TaskItem({ task }: { task: Task }) {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
 export function TaskManager() {
   const { tasks, addTask } = useAppContext();
-  const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   
   const [newTaskTitle, setNewTaskTitle] = React.useState('');
@@ -166,11 +202,16 @@ export function TaskManager() {
          return task.isCompleted;
      }
      return !task.isCompleted && task.status === status;
-  });
+  }).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between">
+      <motion.div 
+        className="flex items-center justify-between"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
         <h1 className="text-2xl font-semibold text-white">Task Manager</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -265,7 +306,7 @@ export function TaskManager() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </motion.div>
 
       <Tabs defaultValue="today" className="flex flex-1 flex-col mt-4">
         <TabsList>
@@ -274,24 +315,34 @@ export function TaskManager() {
           <TabsTrigger value="someday">Someday</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
         </TabsList>
-        <div className="mt-4 flex-1 space-y-4">
-          <TabsContent value="today" className="space-y-4 m-0">
-            {filteredTasks('Today').map(task => <TaskItem key={task.id} task={task} />)}
-            {filteredTasks('Today').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for today. Great job!</p>}
-          </TabsContent>
-          <TabsContent value="upcoming" className="space-y-4 m-0">
-            {filteredTasks('Upcoming').map(task => <TaskItem key={task.id} task={task} />)}
-            {filteredTasks('Upcoming').length === 0 && <p className="text-center text-muted-foreground pt-10">No upcoming tasks.</p>}
-          </TabsContent>
-          <TabsContent value="someday" className="space-y-4 m-0">
-            {filteredTasks('Someday').map(task => <TaskItem key={task.id} task={task} />)}
-            {filteredTasks('Someday').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for someday.</p>}
-          </TabsContent>
-          <TabsContent value="completed" className="space-y-4 m-0">
-            {filteredTasks('Completed').map(task => <TaskItem key={task.id} task={task} />)}
-            {filteredTasks('Completed').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks completed yet.</p>}
-          </TabsContent>
+        <AnimatePresence mode="wait">
+        <div className="mt-4 flex-1 space-y-2">
+            <TabsContent value="today" className="space-y-0 m-0">
+                <AnimatePresence>
+                  {filteredTasks('Today').map((task, i) => <TaskItem key={task.id} task={task} index={i} />)}
+                </AnimatePresence>
+              {filteredTasks('Today').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for today. Great job!</p>}
+            </TabsContent>
+            <TabsContent value="upcoming" className="space-y-0 m-0">
+                <AnimatePresence>
+                  {filteredTasks('Upcoming').map((task, i) => <TaskItem key={task.id} task={task} index={i} />)}
+                </AnimatePresence>
+              {filteredTasks('Upcoming').length === 0 && <p className="text-center text-muted-foreground pt-10">No upcoming tasks.</p>}
+            </TabsContent>
+            <TabsContent value="someday" className="space-y-0 m-0">
+                <AnimatePresence>
+                  {filteredTasks('Someday').map((task, i) => <TaskItem key={task.id} task={task} index={i} />)}
+                </AnimatePresence>
+              {filteredTasks('Someday').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks for someday.</p>}
+            </TabsContent>
+            <TabsContent value="completed" className="space-y-0 m-0">
+                <AnimatePresence>
+                  {filteredTasks('Completed').map((task, i) => <TaskItem key={task.id} task={task} index={i} />)}
+                </AnimatePresence>
+              {filteredTasks('Completed').length === 0 && <p className="text-center text-muted-foreground pt-10">No tasks completed yet.</p>}
+            </TabsContent>
         </div>
+        </AnimatePresence>
       </Tabs>
     </div>
   );
