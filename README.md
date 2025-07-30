@@ -18,25 +18,24 @@ npm run dev
 
 Open [http://localhost:9002](http://localhost:9002) with your browser to see the result.
 
-## Deploying to Vercel
+## Deploying to Netlify
 
-To deploy your application to Vercel, follow these steps:
+To deploy your application to Netlify, follow these steps:
 
 1.  **Push to a Git Repository**: Make sure your project is pushed to a GitHub, GitLab, or Bitbucket repository.
 
-2.  **Import Project on Vercel**:
-    *   Go to your [Vercel Dashboard](https://vercel.com/dashboard) and click **Add New...** > **Project**.
-    *   Import the Git repository containing your project.
+2.  **Import Project on Netlify**:
+    *   Go to your [Netlify Dashboard](https://app.netlify.com/) and click **Add new site** > **Import an existing project**.
+    *   Connect your Git provider and select the repository for this project.
 
-3.  **Configure Environment Variables**:
-    *   During the import process, Vercel will ask you to configure your project.
-    *   Go to the **Environment Variables** section.
+3.  **Configure Build Settings & Environment Variables**:
+    *   Netlify will automatically detect that you are using Next.js and configure the build settings. You can leave these as default.
+    *   Go to the **Environment variables** section.
     *   Add the following variables. You can get these values from your Supabase project settings.
         *   `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
         *   `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase project anon key.
 
 4.  **Deploy**:
-    *   Vercel will automatically detect that you are using Next.js and configure the build settings.
-    *   Click the **Deploy** button.
+    *   Click the **Deploy site** button.
 
-Your website will be built and deployed. Vercel will provide you with a URL to access your live site.
+Your website will be built and deployed. Netlify will provide you with a URL to access your live site.
