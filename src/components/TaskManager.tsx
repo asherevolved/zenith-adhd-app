@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlusCircle, MoreVertical, Trash2, X } from 'lucide-react';
+import { PlusCircle, MoreVertical, Trash2, X, Bell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +26,7 @@ import { Checkbox } from './ui/checkbox';
 import { Progress } from './ui/progress';
 import { format } from 'date-fns';
 import { useAppContext } from '@/context/AppContext';
+import { useToast } from '@/hooks/use-toast';
 
 const priorityColors = {
   Urgent: 'border-red-500/50 text-red-400',
@@ -82,7 +83,12 @@ function TaskItem({ task, index }: { task: Task, index: number }) {
             >
               {task.title}
             </label>
-            <p className="text-xs text-muted-foreground">Due: {format(new Date(task.dueDate), 'PPP')}</p>
+             <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Due: {format(new Date(task.dueDate), 'PPP')}</span>
+                {task.reminder && !task.isCompleted && (
+                    <span className="flex items-center gap-1"><Bell className="size-3" /> {task.reminder} min before</span>
+                )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -135,7 +141,9 @@ function TaskItem({ task, index }: { task: Task, index: number }) {
 
 export function TaskManager() {
   const { tasks, addTask } = useAppContext();
+  const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [notificationPermission, setNotificationPermission] = React.useState('default');
   
   const [newTaskTitle, setNewTaskTitle] = React.useState('');
   const [newTaskNotes, setNewTaskNotes] = React.useState('');
@@ -143,6 +151,26 @@ export function TaskManager() {
   const [newTaskStatus, setNewTaskStatus] = React.useState<Task['status']>('Today');
   const [subtasks, setSubtasks] = React.useState<Partial<Subtask>[]>([{ title: '' }]);
   const [newReminder, setNewReminder] = React.useState('');
+
+  React.useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  const requestNotificationPermission = () => {
+    if ('Notification' in window) {
+      Notification.requestPermission().then(permission => {
+        setNotificationPermission(permission);
+        if (permission === 'granted') {
+          toast({ title: 'Notifications enabled!', description: 'You will now receive task reminders.' });
+        } else {
+          toast({ title: 'Notifications blocked', description: 'To receive reminders, enable notifications in your browser settings.', variant: 'destructive' });
+        }
+      });
+    }
+  };
+
 
   const resetForm = () => {
     setNewTaskTitle('');
@@ -165,6 +193,12 @@ export function TaskManager() {
             isCompleted: false
         }));
 
+    const reminderValue = newReminder ? parseInt(newReminder, 10) : undefined;
+    if (reminderValue && notificationPermission !== 'granted') {
+       toast({ title: 'Enable Notifications', description: 'Please allow notifications to set a reminder.', variant: 'destructive' });
+       return;
+    }
+
     const newTask: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id'> = {
       title: newTaskTitle,
       notes: newTaskNotes,
@@ -172,6 +206,7 @@ export function TaskManager() {
       priority: newTaskPriority,
       status: newTaskStatus,
       subtasks: finalSubtasks,
+      reminder: reminderValue,
     };
 
     addTask(newTask);
@@ -263,7 +298,7 @@ export function TaskManager() {
                     </div>
                 </div>
                  <div>
-                  <Label htmlFor="reminder">Reminder (in minutes)</Label>
+                  <Label htmlFor="reminder">Reminder (minutes before due)</Label>
                    <Input 
                     id="reminder"
                     type="number"
@@ -271,9 +306,14 @@ export function TaskManager() {
                     onChange={(e) => setNewReminder(e.target.value)}
                     placeholder="e.g. 15"
                     className="mt-1"
-                    disabled
+                    disabled={notificationPermission === 'denied'}
                    />
-                   <p className="text-xs text-muted-foreground mt-1">Notifications are disabled.</p>
+                   {notificationPermission === 'denied' && (
+                     <p className="text-xs text-red-400 mt-1">Notifications are blocked by your browser.</p>
+                   )}
+                     {notificationPermission === 'default' && (
+                        <Button variant="link" size="sm" className="px-0" onClick={requestNotificationPermission}>Enable Notifications</Button>
+                    )}
                 </div>
               </div>
               {/* Right Column */}

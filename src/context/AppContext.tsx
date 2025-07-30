@@ -1,10 +1,10 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import type { Task, Habit, JournalEntry, UserSettings, Profile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { format, subDays } from 'date-fns';
+import { format, subDays, parseISO, subMinutes } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import type { User } from '@supabase/supabase-js';
 
@@ -35,6 +35,33 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const scheduleNotification = (task: Task) => {
+  if (!task.reminder || !('Notification' in window) || Notification.permission !== 'granted') {
+    return;
+  }
+
+  const dueDate = parseISO(task.dueDate + 'T23:59:59'); // Assume end of day
+  const notificationTime = subMinutes(dueDate, task.reminder);
+  const now = new Date();
+
+  if (notificationTime > now) {
+    const delay = notificationTime.getTime() - now.getTime();
+    const timeoutId = setTimeout(() => {
+      new Notification(`Task Reminder: ${task.title}`, {
+        body: task.notes || 'This task is due soon!',
+        icon: '/favicon.ico'
+      });
+    }, delay);
+    return timeoutId;
+  }
+  return null;
+};
+
+const clearNotification = (timeoutId: number) => {
+    clearTimeout(timeoutId);
+};
+
+
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -46,6 +73,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | undefined>(undefined);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const notificationTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+
+  useEffect(() => {
+    // Clear all timeouts on component unmount
+    return () => {
+        notificationTimeouts.current.forEach(clearNotification);
+    };
+  }, []);
+
+  useEffect(() => {
+    tasks.forEach(task => {
+        if (!task.isCompleted && task.reminder && !notificationTimeouts.current.has(task.id)) {
+            const timeoutId = scheduleNotification(task);
+            if(timeoutId) {
+                notificationTimeouts.current.set(task.id, timeoutId as unknown as NodeJS.Timeout);
+            }
+        }
+    });
+  }, [tasks])
+
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -63,6 +111,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           setSettings(null);
           setProfile(null);
           setIsLoadingData(false);
+          notificationTimeouts.current.forEach(clearNotification);
+          notificationTimeouts.current.clear();
         }
       }
     );
@@ -170,6 +220,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteTask = async (id: string) => {
+    const timeoutId = notificationTimeouts.current.get(id);
+    if(timeoutId) {
+        clearNotification(timeoutId as unknown as number);
+        notificationTimeouts.current.delete(id);
+    }
     const { error } = await supabase.from('tasks').delete().eq('id', id);
     if (error) {
         toast({ title: 'Error deleting task', description: error.message, variant: 'destructive' });
@@ -182,6 +237,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const toggleTaskCompletion = async (id: string, isCompleted: boolean) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
+
+    if (isCompleted) {
+        const timeoutId = notificationTimeouts.current.get(id);
+        if(timeoutId) {
+            clearNotification(timeoutId as unknown as number);
+            notificationTimeouts.current.delete(id);
+        }
+    }
 
     const newSubtasks = task.subtasks.map(st => ({...st, isCompleted }));
 
@@ -207,6 +270,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         st.id === subtaskId ? { ...st, isCompleted } : st
     );
     const allSubtasksCompleted = updatedSubtasks.every(st => st.isCompleted);
+
+    if (allSubtasksCompleted) {
+        const timeoutId = notificationTimeouts.current.get(taskId);
+        if(timeoutId) {
+            clearNotification(timeoutId as unknown as number);
+            notificationTimeouts.current.delete(taskId);
+        }
+    }
 
     const { data, error } = await supabase
         .from('tasks')
