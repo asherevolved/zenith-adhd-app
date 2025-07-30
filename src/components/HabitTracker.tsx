@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { PlusCircle, Flame, Check } from 'lucide-react';
+import { PlusCircle, Flame, Check, MoreVertical, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -13,13 +13,14 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAppContext } from '@/context/AppContext';
 import { format, eachDayOfInterval, startOfWeek, endOfWeek } from 'date-fns';
 
 export function HabitTracker() {
-  const { habits, addHabit, toggleHabit } = useAppContext();
+  const { habits, addHabit, toggleHabit, deleteHabit } = useAppContext();
   const [newHabitName, setNewHabitName] = React.useState('');
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
@@ -80,11 +81,26 @@ export function HabitTracker() {
             <Card key={habit.id}>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>{habit.name}</span>
-                  <div className="flex items-center gap-1 text-orange-400">
-                    <Flame className="size-5" />
-                    <span className="font-bold">{habit.streak}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 text-orange-400">
+                      <Flame className="size-5" />
+                      <span className="font-bold">{habit.streak}</span>
+                    </div>
+                    <span>{habit.name}</span>
                   </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="size-8 shrink-0">
+                        <MoreVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem className="text-red-400" onClick={() => deleteHabit(habit.id)}>
+                        <Trash2 className="mr-2 size-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </CardTitle>
                 <CardDescription>Track your progress for the week.</CardDescription>
               </CardHeader>

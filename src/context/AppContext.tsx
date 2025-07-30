@@ -15,6 +15,7 @@ interface AppContextType {
   toggleSubtaskCompletion: (taskId: string, subtaskId: string, isCompleted: boolean) => void;
   addHabit: (name: string) => void;
   toggleHabit: (habitId: string, date: string) => void;
+  deleteHabit: (habitId: string) => void;
   addJournalEntry: (content: string) => void;
 }
 
@@ -98,6 +99,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setHabits(prev => [...prev, newHabit]);
     toast({ title: 'Habit Added', description: `You are now tracking "${name}".`})
   };
+
+  const deleteHabit = (id: string) => {
+    setHabits(habits.filter(habit => habit.id !== id));
+    toast({ title: "Habit Deleted" });
+  }
 
   const calculateStreak = (completions: Record<string, boolean>): number => {
     let streak = 0;
@@ -187,6 +193,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     toggleSubtaskCompletion,
     addHabit,
     toggleHabit,
+    deleteHabit,
     addJournalEntry,
   };
   
