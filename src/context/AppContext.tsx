@@ -205,16 +205,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   
   const addTask = async (task: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id'>) => {
     if (!user) return;
-    const newTask: Omit<Task, 'id' | 'created_at'> = {
+    const newTask = {
       ...task,
       user_id: user.id,
-      isCompleted: false,
+      is_completed: false, // Corrected column name
     };
     const { data, error } = await supabase.from('tasks').insert(newTask).select().single();
     if (error) {
       toast({ title: 'Error adding task', description: error.message, variant: 'destructive' });
     } else if (data) {
-      setTasks(prev => [data, ...prev]);
+      setTasks(prev => [{ ...data, isCompleted: data.is_completed }, ...prev]);
       toast({ title: "Task Added", description: "Your new task has been added."})
     }
   };
@@ -250,7 +250,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const { data, error } = await supabase
         .from('tasks')
-        .update({ isCompleted, subtasks: newSubtasks })
+        .update({ is_completed: isCompleted, subtasks: newSubtasks })
         .eq('id', id)
         .select()
         .single();
@@ -258,7 +258,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (error) {
         toast({ title: 'Error updating task', description: error.message, variant: 'destructive' });
     } else if (data) {
-        setTasks(tasks.map(t => t.id === id ? data : t));
+        setTasks(tasks.map(t => t.id === id ? { ...data, isCompleted: data.is_completed } : t));
     }
   };
   
@@ -281,7 +281,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const { data, error } = await supabase
         .from('tasks')
-        .update({ subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted })
+        .update({ subtasks: updatedSubtasks, is_completed: allSubtasksCompleted })
         .eq('id', taskId)
         .select()
         .single();
@@ -289,7 +289,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (error) {
         toast({ title: 'Error updating subtask', description: error.message, variant: 'destructive' });
     } else if(data) {
-        setTasks(tasks.map(t => t.id === taskId ? data : t));
+        setTasks(tasks.map(t => t.id === taskId ? { ...data, isCompleted: data.is_completed } : t));
     }
   };
   
@@ -430,3 +430,5 @@ export const useAppContext = () => {
   }
   return context;
 };
+
+    

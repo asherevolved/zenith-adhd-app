@@ -1,3 +1,4 @@
+
 export type Subtask = {
   id: string;
   title: string;
@@ -13,6 +14,7 @@ export type Task = {
   priority: 'Urgent' | 'Medium' | 'Low';
   status: 'Today' | 'Upcoming' | 'Someday';
   isCompleted: boolean;
+  is_completed: boolean;
   subtasks: Subtask[];
   reminder?: number; // minutes
   created_at: string;
@@ -59,3 +61,5 @@ export type UserSettings = {
   journal_retention: '7' | '30' | 'Forever';
   enable_motion: boolean;
 };
+
+    
