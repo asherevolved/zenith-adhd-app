@@ -25,7 +25,7 @@ interface AppContextType {
   therapyMessages: ChatMessage[];
   isLoadingSettings: boolean;
   isLoadingTherapyHistory: boolean;
-  addTask: (task: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id'>) => void;
+  addTask: (task: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id' | 'is_completed'>) => void;
   deleteTask: (id: string) => void;
   toggleTaskCompletion: (id: string, isCompleted: boolean) => void;
   toggleSubtaskCompletion: (taskId: string, subtaskId: string, isCompleted: boolean) => void;
@@ -154,7 +154,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setIsLoadingTherapyHistory(true);
     try {
       const [tasksData, habitsData, journalData, settingsData, profileData, therapyData] = await Promise.all([
-        supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('tasks').select('*, is_completed').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('user_settings').select('*').eq('id', userId).single(),
@@ -171,7 +171,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (profileData.error && profileData.status !== 406) throw profileData.error;
 
 
-      setTasks(tasksData.data || []);
+      setTasks((tasksData.data || []).map(t => ({...t, isCompleted: t.is_completed})));
       setHabits(habitsData.data || []);
       setJournalEntries(journalData.data || []);
       setTherapyMessages(therapyData.data || []);
@@ -215,14 +215,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
   };
   
-  const addTask = async (task: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id'>) => {
+  const addTask = async (task: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id' | 'is_completed'>) => {
     if (!user) return;
     const newTask = {
       ...task,
       user_id: user.id,
       is_completed: false, // Corrected column name
     };
-    const { data, error } = await supabase.from('tasks').insert(newTask).select().single();
+    const { data, error } = await supabase.from('tasks').insert(newTask).select('*, is_completed').single();
     if (error) {
       toast({ title: 'Error adding task', description: error.message, variant: 'destructive' });
     } else if (data) {
@@ -264,7 +264,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         .from('tasks')
         .update({ is_completed: isCompleted, subtasks: newSubtasks })
         .eq('id', id)
-        .select()
+        .select('*, is_completed')
         .single();
     
     if (error) {
@@ -295,7 +295,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         .from('tasks')
         .update({ subtasks: updatedSubtasks, is_completed: allSubtasksCompleted })
         .eq('id', taskId)
-        .select()
+        .select('*, is_completed')
         .single();
 
     if (error) {
@@ -410,51 +410,50 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const sendTherapyMessage = async (messageContent: string) => {
     if (!user) return;
 
-    const optimisticUserMessage: ChatMessage = {
-        id: crypto.randomUUID(),
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      user_id: user.id,
+      role: 'user',
+      content: messageContent,
+      created_at: new Date().toISOString(),
+    };
+
+    const currentMessages = [...therapyMessages, userMessage];
+    setTherapyMessages(currentMessages);
+
+    try {
+      // Don't wait for this to complete to improve latency
+      supabase.from('therapy_chat_messages').insert({
         user_id: user.id,
         role: 'user',
         content: messageContent,
-        created_at: new Date().toISOString(),
-    };
+      }).then(({ error }) => {
+        if(error) console.error("Error saving user message", error);
+      });
 
-    setTherapyMessages(prev => [...prev, optimisticUserMessage]);
+      const chatHistoryForAi = currentMessages.slice(-10);
 
-    try {
-        const { error: userError } = await supabase.from('therapy_chat_messages').insert({
-            user_id: user.id,
-            role: 'user',
-            content: messageContent,
-        });
-        if (userError) throw userError;
+      const chatInput: TherapyChatInput = {
+        message: messageContent,
+        chatHistory: chatHistoryForAi.map(m => ({ role: m.role, content: m.content }))
+      };
 
-        const chatHistoryForAi = [...therapyMessages, optimisticUserMessage].slice(-10);
+      const result = await therapyChat(chatInput);
+      const assistantMessageContent = result.response;
 
-        const chatInput: TherapyChatInput = {
-            message: messageContent,
-            chatHistory: chatHistoryForAi.map(m => ({ role: m.role, content: m.content }))
-        };
+      const { data: assistantData, error: assistantError } = await supabase.from('therapy_chat_messages').insert({
+        user_id: user.id,
+        role: 'assistant',
+        content: assistantMessageContent,
+      }).select().single();
 
-        const result = await therapyChat(chatInput);
-        const assistantMessageContent = result.response;
+      if (assistantError) throw assistantError;
 
-        const { data: assistantData, error: assistantError } = await supabase.from('therapy_chat_messages').insert({
-            user_id: user.id,
-            role: 'assistant',
-            content: assistantMessageContent,
-        }).select().single();
-
-        if (assistantError) throw assistantError;
-
-        setTherapyMessages(prev => {
-            const newMessages = prev.filter(m => m.id !== optimisticUserMessage.id);
-            return [...newMessages, assistantData];
-        });
-
+      setTherapyMessages(prev => [...prev, assistantData]);
     } catch (error) {
-        console.error("Error sending therapy message:", error);
-        setTherapyMessages(prev => prev.filter(m => m.id !== optimisticUserMessage.id));
-        toast({ title: "An error occurred", description: "Could not send message. Please try again.", variant: 'destructive' });
+      console.error("Error sending therapy message:", error);
+      setTherapyMessages(prev => prev.filter(m => m.id !== userMessage.id));
+      toast({ title: "An error occurred", description: "Could not send message. Please try again.", variant: 'destructive' });
     }
   }
 
@@ -496,3 +495,5 @@ export const useAppContext = () => {
   }
   return context;
 };
+
+    
