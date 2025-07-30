@@ -118,6 +118,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           setProfile(null);
           setTherapyMessages([]);
           setIsLoadingData(false);
+          setIsLoadingSettings(false);
+          setIsLoadingTherapyHistory(false);
           notificationTimeouts.current.forEach(clearNotification);
           notificationTimeouts.current.clear();
         }
@@ -133,11 +135,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setIsAuthenticated(!!currentUser);
         if (currentUser) {
           await loadUserData(currentUser.id);
+        } else {
+          setIsLoadingData(false);
         }
       } catch (error) {
         console.error("Error checking user session:", error);
         setIsAuthenticated(false);
-      } finally {
         setIsLoadingData(false);
       }
     };
@@ -152,39 +155,43 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setIsLoadingData(true);
     setIsLoadingSettings(true);
     setIsLoadingTherapyHistory(true);
+
     try {
-      const [tasksData, habitsData, journalData, settingsData, profileData, therapyData] = await Promise.all([
-        supabase.from('tasks').select('*, is_completed').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('user_settings').select('*').eq('id', userId).single(),
-        supabase.from('profiles').select('*').eq('id', userId).single(),
-        supabase.from('therapy_chat_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
-      ]);
+        const [tasksData, habitsData, journalData, settingsData, profileData, therapyData] = await Promise.all([
+            supabase.from('tasks').select('*, is_completed').eq('user_id', userId).order('created_at', { ascending: false }),
+            supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+            supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+            supabase.from('user_settings').select('*').eq('id', userId).single(),
+            supabase.from('profiles').select('*').eq('id', userId).single(),
+            supabase.from('therapy_chat_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
+        ]);
 
-      if (tasksData.error) throw tasksData.error;
-      if (habitsData.error) throw habitsData.error;
-      if (journalData.error) throw journalData.error;
-      if (therapyData.error) throw therapyData.error;
-      // It's okay if settings or profile are not found initially for a new user
-      if (settingsData.error && settingsData.status !== 406) throw settingsData.error;
-      if (profileData.error && profileData.status !== 406) throw profileData.error;
+        if (tasksData.error) throw new Error(`Tasks: ${tasksData.error.message}`);
+        setTasks((tasksData.data || []).map(t => ({...t, isCompleted: t.is_completed})));
+        
+        if (habitsData.error) throw new Error(`Habits: ${habitsData.error.message}`);
+        setHabits(habitsData.data || []);
 
-
-      setTasks((tasksData.data || []).map(t => ({...t, isCompleted: t.is_completed})));
-      setHabits(habitsData.data || []);
-      setJournalEntries(journalData.data || []);
-      setTherapyMessages(therapyData.data || []);
-      setSettings(settingsData.data || null);
-      setProfile(profileData.data || null);
+        if (journalData.error) throw new Error(`Journal: ${journalData.error.message}`);
+        setJournalEntries(journalData.data || []);
+        
+        // It's okay if settings or profile are not found initially for a new user
+        if (settingsData.error && settingsData.status !== 406) throw new Error(`Settings: ${settingsData.error.message}`);
+        setSettings(settingsData.data || null);
+        
+        if (profileData.error && profileData.status !== 406) throw new Error(`Profile: ${profileData.error.message}`);
+        setProfile(profileData.data || null);
+        
+        if (therapyData.error) throw new Error(`Therapy: ${therapyData.error.message}`);
+        setTherapyMessages(therapyData.data || []);
 
     } catch (error: any) {
-      console.error("Failed to load user data from Supabase", error);
-      toast({ title: 'Error', description: 'Could not load your data.', variant: 'destructive' });
+        console.error("Failed to load user data from Supabase", error.message);
+        toast({ title: 'Error Loading Data', description: 'Could not load all your data. Some features might be unavailable.', variant: 'destructive' });
     } finally {
-      setIsLoadingData(false);
-      setIsLoadingSettings(false);
-      setIsLoadingTherapyHistory(false);
+        setIsLoadingData(false);
+        setIsLoadingSettings(false);
+        setIsLoadingTherapyHistory(false);
     }
   }
 
@@ -220,7 +227,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const newTask = {
       ...task,
       user_id: user.id,
-      is_completed: false, // Corrected column name
+      is_completed: false,
+      due_date: task.due_date,
     };
     const { data, error } = await supabase.from('tasks').insert(newTask).select('*, is_completed').single();
     if (error) {
@@ -469,7 +477,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     journalEntries,
     settings,
     therapyMessages,
-    isLoadingSettings: isLoadingData || isLoadingSettings,
+    isLoadingSettings: isLoadingSettings,
     isLoadingTherapyHistory,
     addTask,
     deleteTask,
@@ -483,7 +491,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     sendTherapyMessage,
   };
   
-  if (isLoadingData) return null;
+  if (isAuthenticated === undefined) {
+    return null; // Or a full-page loader
+  }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
@@ -495,5 +505,3 @@ export const useAppContext = () => {
   }
   return context;
 };
-
-    
