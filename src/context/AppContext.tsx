@@ -33,6 +33,7 @@ interface AppContextType {
   toggleHabit: (habitId: string, date: string) => void;
   deleteHabit: (habitId: string) => void;
   addJournalEntry: (content: string) => void;
+  deleteJournalEntry: (id: string) => void;
   updateSettings: (newSettings: UserSettings) => Promise<void>;
   sendTherapyMessage: (message: string) => Promise<void>;
 }
@@ -76,7 +77,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | undefined>(undefined);
-  const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [isLoadingTherapyHistory, setIsLoadingTherapyHistory] = useState(true);
   const notificationTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -117,7 +117,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           setSettings(null);
           setProfile(null);
           setTherapyMessages([]);
-          setIsLoadingData(false);
           setIsLoadingSettings(false);
           setIsLoadingTherapyHistory(false);
           notificationTimeouts.current.forEach(clearNotification);
@@ -135,13 +134,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setIsAuthenticated(!!currentUser);
         if (currentUser) {
           await loadUserData(currentUser.id);
-        } else {
-          setIsLoadingData(false);
         }
       } catch (error) {
         console.error("Error checking user session:", error);
         setIsAuthenticated(false);
-        setIsLoadingData(false);
+      } finally {
+        // This ensures the app renders even if there's no user initially
+        if (isAuthenticated === undefined) {
+             setIsAuthenticated(!!user);
+        }
       }
     };
     checkUser();
@@ -152,44 +153,48 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const loadUserData = async (userId: string) => {
-    setIsLoadingData(true);
+    
+    // Reset loading states
     setIsLoadingSettings(true);
     setIsLoadingTherapyHistory(true);
 
     try {
-        const [tasksData, habitsData, journalData, settingsData, profileData, therapyData] = await Promise.all([
-            supabase.from('tasks').select('*, is_completed').eq('user_id', userId).order('created_at', { ascending: false }),
-            supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-            supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-            supabase.from('user_settings').select('*').eq('id', userId).single(),
-            supabase.from('profiles').select('*').eq('id', userId).single(),
-            supabase.from('therapy_chat_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
-        ]);
+        // Fetch tasks
+        const { data: tasksData, error: tasksError } = await supabase.from('tasks').select('*, is_completed').eq('user_id', userId).order('created_at', { ascending: false });
+        if (tasksError) throw new Error(`Tasks: ${tasksError.message}`);
+        setTasks((tasksData || []).map(t => ({...t, isCompleted: t.is_completed})));
+        
+        // Fetch habits
+        const { data: habitsData, error: habitsError } = await supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+        if (habitsError) throw new Error(`Habits: ${habitsError.message}`);
+        setHabits(habitsData || []);
 
-        if (tasksData.error) throw new Error(`Tasks: ${tasksData.error.message}`);
-        setTasks((tasksData.data || []).map(t => ({...t, isCompleted: t.is_completed})));
+        // Fetch journal entries
+        const { data: journalData, error: journalError } = await supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+        if (journalError) throw new Error(`Journal: ${journalError.message}`);
+        setJournalEntries(journalData || []);
         
-        if (habitsData.error) throw new Error(`Habits: ${habitsData.error.message}`);
-        setHabits(habitsData.data || []);
+        // Fetch settings - okay if not found for new users
+        const { data: settingsData, error: settingsError } = await supabase.from('user_settings').select('*').eq('id', userId).single();
+        if (settingsError && settingsError.code !== 'PGRST116') throw new Error(`Settings: ${settingsError.message}`);
+        setSettings(settingsData || null);
+        setIsLoadingSettings(false);
 
-        if (journalData.error) throw new Error(`Journal: ${journalData.error.message}`);
-        setJournalEntries(journalData.data || []);
+        // Fetch profile - okay if not found for new users
+        const { data: profileData, error: profileError } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        if (profileError && profileError.code !== 'PGRST116') throw new Error(`Profile: ${profileError.message}`);
+        setProfile(profileData || null);
         
-        // It's okay if settings or profile are not found initially for a new user
-        if (settingsData.error && settingsData.status !== 406) throw new Error(`Settings: ${settingsData.error.message}`);
-        setSettings(settingsData.data || null);
-        
-        if (profileData.error && profileData.status !== 406) throw new Error(`Profile: ${profileData.error.message}`);
-        setProfile(profileData.data || null);
-        
-        if (therapyData.error) throw new Error(`Therapy: ${therapyData.error.message}`);
-        setTherapyMessages(therapyData.data || []);
+        // Fetch therapy messages
+        const { data: therapyData, error: therapyError } = await supabase.from('therapy_chat_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true });
+        if (therapyError) throw new Error(`Therapy: ${therapyError.message}`);
+        setTherapyMessages(therapyData || []);
+        setIsLoadingTherapyHistory(false);
 
     } catch (error: any) {
         console.error("Failed to load user data from Supabase", error.message);
         toast({ title: 'Error Loading Data', description: 'Could not load all your data. Some features might be unavailable.', variant: 'destructive' });
-    } finally {
-        setIsLoadingData(false);
+        // Set loading states to false even on error to unblock UI
         setIsLoadingSettings(false);
         setIsLoadingTherapyHistory(false);
     }
@@ -393,6 +398,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
      }
   };
 
+  const deleteJournalEntry = async (id: string) => {
+    const { error } = await supabase.from('journal_entries').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Error deleting journal entry', description: error.message, variant: 'destructive' });
+    } else {
+      setJournalEntries(journalEntries.filter(entry => entry.id !== id));
+      toast({ title: "Journal Entry Deleted" });
+    }
+  };
+
   const updateSettings = async (newSettings: UserSettings) => {
     if (!user) return;
     const { data, error } = await supabase
@@ -456,11 +471,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }).select().single();
 
       if (assistantError) throw assistantError;
-
+      
       setTherapyMessages(prev => [...prev, assistantData]);
     } catch (error) {
       console.error("Error sending therapy message:", error);
-      setTherapyMessages(prev => prev.filter(m => m.id !== userMessage.id));
+      setTherapyMessages(prev => prev.filter(m => m.id !== userMessage.id)); // remove optimistic message on failure
       toast({ title: "An error occurred", description: "Could not send message. Please try again.", variant: 'destructive' });
     }
   }
@@ -477,7 +492,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     journalEntries,
     settings,
     therapyMessages,
-    isLoadingSettings: isLoadingSettings,
+    isLoadingSettings,
     isLoadingTherapyHistory,
     addTask,
     deleteTask,
@@ -487,6 +502,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     toggleHabit,
     deleteHabit,
     addJournalEntry,
+    deleteJournalEntry,
     updateSettings,
     sendTherapyMessage,
   };

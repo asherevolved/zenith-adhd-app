@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, BookOpen } from 'lucide-react';
+import { Save, BookOpen, MoreVertical, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -11,6 +11,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAppContext } from '@/context/AppContext';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+
 
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
@@ -21,7 +34,7 @@ const itemVariants = {
 };
 
 export function Journal() {
-  const { journalEntries, addJournalEntry } = useAppContext();
+  const { journalEntries, addJournalEntry, deleteJournalEntry } = useAppContext();
   const [newEntryContent, setNewEntryContent] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
@@ -112,11 +125,47 @@ export function Journal() {
                       transition={{ delay: index * 0.05 }}
                     >
                       <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg flex items-center gap-2"><BookOpen className="size-5 text-primary" /> Journal Entry</CardTitle>
-                          <CardDescription>
-                            {format(new Date(entry.created_at), "MMMM d, yyyy 'at' h:mm a")}
-                          </CardDescription>
+                        <CardHeader className="flex flex-row items-start justify-between">
+                            <div>
+                                <CardTitle className="text-lg flex items-center gap-2"><BookOpen className="size-5 text-primary" /> Journal Entry</CardTitle>
+                                <CardDescription>
+                                    {format(new Date(entry.created_at), "MMMM d, yyyy 'at' h:mm a")}
+                                </CardDescription>
+                            </div>
+                            <AlertDialog>
+                                <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="size-8 shrink-0">
+                                    <MoreVertical className="size-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem className="text-red-400">
+                                            <Trash2 className="mr-2 size-4" />
+                                            Delete
+                                        </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                </DropdownMenuContent>
+                                </DropdownMenu>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete your journal entry.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                        onClick={() => deleteJournalEntry(entry.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        >
+                                        Delete
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </CardHeader>
                         <CardContent>
                             <p className="text-muted-foreground whitespace-pre-wrap">{entry.content}</p>
