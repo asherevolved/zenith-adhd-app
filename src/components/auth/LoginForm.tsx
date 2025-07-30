@@ -38,6 +38,7 @@ export function LoginForm() {
   const { login } = useAppContext();
   const router = useRouter();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = React.useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -47,8 +48,9 @@ export function LoginForm() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    const success = login(values.email, values.password);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsLoading(true);
+    const success = await login(values.email, values.password);
     if (success) {
       toast({
         title: 'Login Successful',
@@ -62,6 +64,7 @@ export function LoginForm() {
         variant: 'destructive',
       });
     }
+    setIsLoading(false);
   }
 
   return (
@@ -86,6 +89,7 @@ export function LoginForm() {
                       <Input
                         placeholder="m@example.com"
                         {...field}
+                        disabled={isLoading}
                       />
                     </FormControl>
                     <FormMessage />
@@ -99,14 +103,14 @@ export function LoginForm() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" {...field} />
+                      <Input type="password" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full">
-                Sign In
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Signing In...' : 'Sign In'}
               </Button>
             </form>
           </Form>

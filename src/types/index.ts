@@ -6,6 +6,7 @@ export type Subtask = {
 
 export type Task = {
   id: string;
+  user_id: string;
   title: string;
   notes?: string;
   dueDate: string;
@@ -19,6 +20,7 @@ export type Task = {
 
 export type Habit = {
   id: string;
+  user_id: string;
   name: string;
   streak: number;
   completions: Record<string, boolean>; // e.g., { '2024-10-27': true }
@@ -27,6 +29,7 @@ export type Habit = {
 
 export type JournalEntry = {
   id: string;
+  user_id: string;
   content: string;
   createdAt: string;
 };

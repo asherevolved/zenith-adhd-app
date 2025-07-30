@@ -2,27 +2,24 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { Task, Subtask, Habit, JournalEntry } from '@/types';
+import type { Task, Habit, JournalEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, subDays } from 'date-fns';
-
-// Mock user type
-type User = {
-  email: string;
-};
+import { supabase } from '@/lib/supabaseClient';
+import type { User, Session } from '@supabase/supabase-js';
 
 interface AppContextType {
   // Auth state
   isAuthenticated: boolean;
   user: User | null;
-  login: (email: string, pass: string) => boolean;
-  signup: (email: string, pass: string) => boolean;
+  login: (email: string, pass: string) => Promise<boolean>;
+  signup: (email: string, pass: string) => Promise<boolean>;
   logout: () => void;
   // App state
   tasks: Task[];
   habits: Habit[];
   journalEntries: JournalEntry[];
-  addTask: (task: Omit<Task, 'id' | 'isCompleted' | 'created_at'>) => void;
+  addTask: (task: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id'>) => void;
   deleteTask: (id: string) => void;
   toggleTaskCompletion: (id: string, isCompleted: boolean) => void;
   toggleSubtaskCompletion: (taskId: string, subtaskId: string, isCompleted: boolean) => void;
@@ -34,9 +31,6 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// In a real app, this would be in a database
-const MOCK_USERS = 'mock_users';
-
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -45,168 +39,188 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  
-  // Load state from localStorage on mount
+
   useEffect(() => {
-    try {
-      // Auth state
-      const storedUser = localStorage.getItem('currentUser');
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        setIsAuthenticated(!!currentUser);
+        if (currentUser) {
+          loadUserData(currentUser.id);
+        } else {
+          // Clear data on logout
+          setTasks([]);
+          setHabits([]);
+          setJournalEntries([]);
+        }
+      }
+    );
+
+    // Initial check
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
         setIsAuthenticated(true);
-        loadUserData(parsedUser.email);
+        loadUserData(session.user.id);
       }
-    } catch (error) {
-      console.error("Failed to parse auth state from localStorage", error);
-    }
-    setIsMounted(true);
+      setIsMounted(true);
+    };
+    checkUser();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
-  
-  const getStorageKey = (key: string, email?: string) => {
-    const userEmail = email || user?.email;
-    if (!userEmail) return null;
-    return `${userEmail}_${key}`;
-  }
 
-  const loadUserData = (email: string) => {
-     try {
-      const tasksKey = getStorageKey('tasks', email);
-      const habitsKey = getStorageKey('habits', email);
-      const journalKey = getStorageKey('journal', email);
+  const loadUserData = async (userId: string) => {
+    try {
+      const [tasksData, habitsData, journalData] = await Promise.all([
+        supabase.from('tasks').select('*').eq('user_id', userId),
+        supabase.from('habits').select('*').eq('user_id', userId),
+        supabase.from('journal_entries').select('*').eq('user_id', userId)
+      ]);
 
-      if (tasksKey) {
-        const storedTasks = localStorage.getItem(tasksKey);
-        if (storedTasks) setTasks(JSON.parse(storedTasks));
-        else setTasks([]);
-      }
-      if (habitsKey) {
-        const storedHabits = localStorage.getItem(habitsKey);
-        if (storedHabits) setHabits(JSON.parse(storedHabits));
-        else setHabits([]);
-      }
-      if (journalKey) {
-        const storedJournal = localStorage.getItem(journalKey);
-        if (storedJournal) setJournalEntries(JSON.parse(storedJournal));
-        else setJournalEntries([]);
-      }
-    } catch (error) {
-        console.error("Failed to load user data from localStorage", error);
-        setTasks([]);
-        setHabits([]);
-        setJournalEntries([]);
+      if (tasksData.error) throw tasksData.error;
+      if (habitsData.error) throw habitsData.error;
+      if (journalData.error) throw journalData.error;
+
+      setTasks(tasksData.data || []);
+      setHabits(habitsData.data || []);
+      setJournalEntries(journalData.data || []);
+    } catch (error: any) {
+      console.error("Failed to load user data from Supabase", error);
+      toast({ title: 'Error', description: 'Could not load your data.', variant: 'destructive' });
     }
   }
 
-  // Save state to localStorage whenever it changes
-  useEffect(() => {
-    if (isMounted && isAuthenticated && user) {
-      const tasksKey = getStorageKey('tasks');
-      const habitsKey = getStorageKey('habits');
-      const journalKey = getStorageKey('journal');
-
-      if (tasksKey) localStorage.setItem(tasksKey, JSON.stringify(tasks));
-      if (habitsKey) localStorage.setItem(habitsKey, JSON.stringify(habits));
-      if (journalKey) localStorage.setItem(journalKey, JSON.stringify(journalEntries));
+  const login = async (email: string, pass: string): Promise<boolean> => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    if (error) {
+      console.error('Login error:', error.message);
+      return false;
     }
-  }, [tasks, habits, journalEntries, user, isAuthenticated, isMounted]);
-
-  const login = (email: string, pass: string): boolean => {
-    const users = JSON.parse(localStorage.getItem(MOCK_USERS) || '{}');
-    if (users[email] && users[email] === pass) {
-      const loggedInUser = { email };
-      localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
-      setUser(loggedInUser);
-      setIsAuthenticated(true);
-      loadUserData(email);
-      return true;
-    }
-    return false;
-  };
-
-  const signup = (email: string, pass: string): boolean => {
-    const users = JSON.parse(localStorage.getItem(MOCK_USERS) || '{}');
-    if (users[email]) {
-      return false; // User already exists
-    }
-    users[email] = pass;
-    localStorage.setItem(MOCK_USERS, JSON.stringify(users));
-    
-    // Automatically log in after signup
-    const loggedInUser = { email };
-    localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
-    setUser(loggedInUser);
-    setIsAuthenticated(true);
-    loadUserData(email);
     return true;
   };
 
-  const logout = () => {
-    localStorage.removeItem('currentUser');
+  const signup = async (email: string, pass: string): Promise<boolean> => {
+    const { error } = await supabase.auth.signUp({ email, password: pass });
+     if (error) {
+      console.error('Signup error:', error.message);
+      return false;
+    }
+    return true;
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setIsAuthenticated(false);
-    setTasks([]);
-    setHabits([]);
-    setJournalEntries([]);
     toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
   };
   
-  const addTask = (task: Omit<Task, 'id' | 'isCompleted' | 'created_at'>) => {
-    const newTask: Task = {
+  const addTask = async (task: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id'>) => {
+    if (!user) return;
+    const newTask: Omit<Task, 'id' | 'created_at'> = {
       ...task,
-      id: crypto.randomUUID(),
+      user_id: user.id,
       isCompleted: false,
-      created_at: new Date().toISOString(),
     };
-    setTasks(prev => [newTask, ...prev]);
+    const { data, error } = await supabase.from('tasks').insert(newTask).select().single();
+    if (error) {
+      toast({ title: 'Error adding task', description: error.message, variant: 'destructive' });
+    } else if (data) {
+      setTasks(prev => [data, ...prev]);
+      toast({ title: "Task Added", description: "Your new task has been added."})
+    }
   };
   
-  const deleteTask = (id: string) => {
-    setTasks(tasks.filter(task => task.id !== id));
-    toast({ title: "Task Deleted" });
+  const deleteTask = async (id: string) => {
+    const { error } = await supabase.from('tasks').delete().eq('id', id);
+    if (error) {
+        toast({ title: 'Error deleting task', description: error.message, variant: 'destructive' });
+    } else {
+        setTasks(tasks.filter(task => task.id !== id));
+        toast({ title: "Task Deleted" });
+    }
   };
   
-  const toggleTaskCompletion = (id: string, isCompleted: boolean) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, isCompleted, subtasks: task.subtasks.map(st => ({ ...st, isCompleted })) } : task
-    ));
+  const toggleTaskCompletion = async (id: string, isCompleted: boolean) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+
+    const newSubtasks = task.subtasks.map(st => ({...st, isCompleted }));
+
+    const { data, error } = await supabase
+        .from('tasks')
+        .update({ isCompleted, subtasks: newSubtasks })
+        .eq('id', id)
+        .select()
+        .single();
+    
+    if (error) {
+        toast({ title: 'Error updating task', description: error.message, variant: 'destructive' });
+    } else if (data) {
+        setTasks(tasks.map(t => t.id === id ? data : t));
+    }
   };
   
-  const toggleSubtaskCompletion = (taskId: string, subtaskId: string, isCompleted: boolean) => {
-    setTasks(tasks.map(t => {
-      if (t.id === taskId) {
-        const updatedSubtasks = t.subtasks.map(st => 
-            st.id === subtaskId ? { ...st, isCompleted } : st
-        );
-        const allSubtasksCompleted = updatedSubtasks.every(st => st.isCompleted);
-        return { ...t, subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted };
-      }
-      return t;
-    }));
+  const toggleSubtaskCompletion = async (taskId: string, subtaskId: string, isCompleted: boolean) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const updatedSubtasks = task.subtasks.map(st => 
+        st.id === subtaskId ? { ...st, isCompleted } : st
+    );
+    const allSubtasksCompleted = updatedSubtasks.every(st => st.isCompleted);
+
+    const { data, error } = await supabase
+        .from('tasks')
+        .update({ subtasks: updatedSubtasks, isCompleted: allSubtasksCompleted })
+        .eq('id', taskId)
+        .select()
+        .single();
+
+    if (error) {
+        toast({ title: 'Error updating subtask', description: error.message, variant: 'destructive' });
+    } else if(data) {
+        setTasks(tasks.map(t => t.id === taskId ? data : t));
+    }
   };
   
-  const addHabit = (name: string) => {
-    const newHabit: Habit = {
-      id: crypto.randomUUID(),
+  const addHabit = async (name: string) => {
+    if (!user) return;
+    const newHabit: Omit<Habit, 'id' | 'created_at'> = {
       name,
+      user_id: user.id,
       streak: 0,
       completions: {},
-      created_at: new Date().toISOString(),
     };
-    setHabits(prev => [...prev, newHabit]);
-    toast({ title: 'Habit Added', description: `You are now tracking "${name}".`})
+    const { data, error } = await supabase.from('habits').insert(newHabit).select().single();
+
+    if (error) {
+        toast({ title: 'Error adding habit', description: error.message, variant: 'destructive' });
+    } else if (data) {
+        setHabits(prev => [...prev, data]);
+        toast({ title: 'Habit Added', description: `You are now tracking "${name}".`})
+    }
   };
 
-  const deleteHabit = (id: string) => {
-    setHabits(habits.filter(habit => habit.id !== id));
-    toast({ title: "Habit Deleted" });
+  const deleteHabit = async (id: string) => {
+    const { error } = await supabase.from('habits').delete().eq('id', id);
+    if (error) {
+        toast({ title: 'Error deleting habit', description: error.message, variant: 'destructive' });
+    } else {
+        setHabits(habits.filter(habit => habit.id !== id));
+        toast({ title: "Habit Deleted" });
+    }
   }
 
   const calculateStreak = (completions: Record<string, boolean>): number => {
     let currentStreak = 0;
     let tempDate = new Date();
     
-    // If not completed today, start checking from yesterday
     if (!completions[format(tempDate, 'yyyy-MM-dd')]) {
       tempDate = subDays(tempDate, 1);
     }
@@ -219,29 +233,44 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return currentStreak;
   }
   
-  const toggleHabit = (habitId: string, date: string) => {
-    setHabits(habits.map(h => {
-      if (h.id === habitId) {
-        const newCompletions = { ...h.completions };
-        if (newCompletions[date]) {
-          delete newCompletions[date];
-        } else {
-          newCompletions[date] = true;
-        }
-        const newStreak = calculateStreak(newCompletions);
-        return { ...h, completions: newCompletions, streak: newStreak };
-      }
-      return h;
-    }));
+  const toggleHabit = async (habitId: string, date: string) => {
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+
+    const newCompletions = { ...habit.completions };
+    if (newCompletions[date]) {
+      delete newCompletions[date];
+    } else {
+      newCompletions[date] = true;
+    }
+    const newStreak = calculateStreak(newCompletions);
+
+    const { data, error } = await supabase
+        .from('habits')
+        .update({ completions: newCompletions, streak: newStreak })
+        .eq('id', habitId)
+        .select()
+        .single();
+    
+    if (error) {
+        toast({ title: 'Error updating habit', description: error.message, variant: 'destructive' });
+    } else if (data) {
+        setHabits(habits.map(h => h.id === habitId ? data : h));
+    }
   };
   
-  const addJournalEntry = (content: string) => {
-    const newEntry: JournalEntry = {
-      id: crypto.randomUUID(),
+  const addJournalEntry = async (content: string) => {
+    if (!user) return;
+    const newEntry: Omit<JournalEntry, 'id' | 'createdAt'> = {
       content,
-      createdAt: new Date().toISOString(),
+      user_id: user.id,
     };
-    setJournalEntries(prev => [newEntry, ...prev].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+     const { data, error } = await supabase.from('journal_entries').insert(newEntry).select().single();
+     if(error) {
+        toast({ title: 'Error adding journal entry', description: error.message, variant: 'destructive' });
+     } else if (data) {
+        setJournalEntries(prev => [data, ...prev].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+     }
   };
 
   const value = {
@@ -263,6 +292,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     addJournalEntry,
   };
   
+  // Render children only when mounted to avoid hydration errors with auth state
+  if (!isMounted) return null;
+
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 

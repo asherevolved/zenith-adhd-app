@@ -38,6 +38,7 @@ export function SignupForm() {
   const { signup } = useAppContext();
   const router = useRouter();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = React.useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -47,21 +48,23 @@ export function SignupForm() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    const success = signup(values.email, values.password);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsLoading(true);
+    const success = await signup(values.email, values.password);
     if (success) {
       toast({
         title: 'Signup Successful',
-        description: "You're now logged in.",
+        description: "You're now logged in. Check your email to verify your account.",
       });
       router.push('/');
     } else {
        toast({
         title: 'Signup Failed',
-        description: 'An account with this email already exists.',
+        description: 'An account with this email may already exist, or another error occurred.',
         variant: 'destructive',
       });
     }
+    setIsLoading(false);
   }
 
   return (
@@ -86,6 +89,7 @@ export function SignupForm() {
                       <Input
                         placeholder="m@example.com"
                         {...field}
+                        disabled={isLoading}
                       />
                     </FormControl>
                     <FormMessage />
@@ -99,14 +103,14 @@ export function SignupForm() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" {...field} />
+                      <Input type="password" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full">
-                Create Account
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Creating Account...' : 'Create Account'}
               </Button>
             </form>
           </Form>

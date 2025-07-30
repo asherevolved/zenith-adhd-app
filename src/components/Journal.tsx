@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -13,6 +14,7 @@ import { useAppContext } from '@/context/AppContext';
 export function Journal() {
   const { journalEntries, addJournalEntry } = useAppContext();
   const [newEntryContent, setNewEntryContent] = React.useState('');
+  const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
 
   const handleSaveJournal = async () => {
@@ -24,8 +26,9 @@ export function Journal() {
       });
       return;
     }
-
-    addJournalEntry(newEntryContent);
+    setIsLoading(true);
+    await addJournalEntry(newEntryContent);
+    setIsLoading(false);
     toast({
       title: 'Journal Saved',
       description: 'Your entry has been successfully saved.',
@@ -43,7 +46,7 @@ export function Journal() {
         <Card>
           <CardHeader>
             <CardTitle>How are you feeling today?</CardTitle>
-            <CardDescription>Write down your thoughts and feelings. They will be saved locally.</CardDescription>
+            <CardDescription>Write down your thoughts and feelings. They will be saved to your account.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Textarea
@@ -51,10 +54,11 @@ export function Journal() {
               className="min-h-[400px] text-base"
               value={newEntryContent}
               onChange={(e) => setNewEntryContent(e.target.value)}
+              disabled={isLoading}
             />
-            <Button onClick={handleSaveJournal} disabled={!newEntryContent.trim()} className="w-full">
+            <Button onClick={handleSaveJournal} disabled={!newEntryContent.trim() || isLoading} className="w-full">
               <Save className="mr-2 h-4 w-4" />
-              Save Entry
+              {isLoading ? 'Saving...' : 'Save Entry'}
             </Button>
           </CardContent>
         </Card>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -66,9 +67,9 @@ function TaskItem({ task }: { task: Task }) {
           </DropdownMenu>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground pt-1 pl-8">Due: {task.dueDate}</p>
+      <p className="text-xs text-muted-foreground pt-1 pl-8">Due: {format(new Date(task.dueDate), 'PPP')}</p>
       
-      {task.subtasks.length > 0 && (
+      {task.subtasks && task.subtasks.length > 0 && (
         <div className="pl-8 mt-4 space-y-3">
           <div className="space-y-2">
             {task.subtasks.map(subtask => (
@@ -128,7 +129,7 @@ export function TaskManager() {
             isCompleted: false
         }));
 
-    const newTask: Omit<Task, 'id' | 'isCompleted' | 'created_at'> = {
+    const newTask: Omit<Task, 'id' | 'isCompleted' | 'created_at' | 'user_id'> = {
       title: newTaskTitle,
       notes: newTaskNotes,
       dueDate: format(new Date(), 'yyyy-MM-dd'),
@@ -138,7 +139,6 @@ export function TaskManager() {
     };
 
     addTask(newTask);
-    toast({ title: "Task Added", description: "Your new task has been added."})
     resetForm();
   }
   
