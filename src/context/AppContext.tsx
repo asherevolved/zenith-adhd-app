@@ -97,8 +97,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (tasksData.error) throw tasksData.error;
       if (habitsData.error) throw habitsData.error;
       if (journalData.error) throw journalData.error;
-      if (settingsData.error) throw settingsData.error;
-      if (profileData.error) throw profileData.error;
+      // It's okay if settings or profile are not found initially for a new user
+      if (settingsData.error && settingsData.status !== 406) throw settingsData.error;
+      if (profileData.error && profileData.status !== 406) throw profileData.error;
+
 
       setTasks(tasksData.data || []);
       setHabits(habitsData.data || []);
@@ -130,7 +132,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     // The trigger will create the profile and settings row
-    return true;
+    return !!data.user;
   };
 
   const logout = async () => {
@@ -281,10 +283,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   
   const addJournalEntry = async (content: string) => {
     if (!user) return;
-    const newEntry: Omit<JournalEntry, 'id' | 'created_at' | 'user_id'> = {
-      content,
-    };
-     const { data, error } = await supabase.from('journal_entries').insert({ ...newEntry, user_id: user.id }).select().single();
+    const { data, error } = await supabase.from('journal_entries').insert({ content, user_id: user.id }).select().single();
      if(error) {
         toast({ title: 'Error adding journal entry', description: error.message, variant: 'destructive' });
      } else if (data) {
