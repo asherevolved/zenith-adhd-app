@@ -71,7 +71,7 @@ export function Journal() {
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2"><BookOpen className="size-5 text-primary" /> Journal Entry</CardTitle>
                   <CardDescription>
-                    {format(new Date(entry.createdAt), "MMMM d, yyyy 'at' h:mm a")}
+                    {format(new Date(entry.created_at), "MMMM d, yyyy 'at' h:mm a")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
