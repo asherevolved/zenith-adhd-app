@@ -27,6 +27,7 @@ import {
 import { CheckCircle2, Target, Trophy, Sparkles } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { eachDayOfInterval, startOfWeek, endOfWeek, format } from 'date-fns';
+import { Skeleton } from './ui/skeleton';
 
 const chartConfig = {
   tasks: {
@@ -63,12 +64,13 @@ const itemVariants = {
 
 
 export function Dashboard() {
-  const { tasks, habits, profile } = useAppContext();
+  const { tasks, habits, profile, isLoadingSettings } = useAppContext();
 
   const tasksCompleted = tasks.filter(t => t.isCompleted).length;
   const activeHabits = habits.length;
   
   const longestHabitStreak = React.useMemo(() => {
+    if (!habits || habits.length === 0) return 0;
     return habits.reduce((maxStreak, habit) => {
       return Math.max(maxStreak, habit.streak);
     }, 0);
@@ -94,6 +96,24 @@ export function Dashboard() {
 
   // A simple way to calculate "badges" or achievements
   const badgesUnlocked = Math.floor(tasksCompleted / 5) + Math.floor(longestHabitStreak / 7);
+
+  if (isLoadingSettings || !tasks || !habits) {
+     return (
+        <div className="space-y-6">
+            <div className="space-y-2">
+                <Skeleton className="h-8 w-1/2" />
+                <Skeleton className="h-4 w-1/3" />
+            </div>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+            </div>
+            <Skeleton className="h-64 w-full" />
+        </div>
+    );
+  }
 
   return (
     <motion.div 
