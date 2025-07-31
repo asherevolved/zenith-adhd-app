@@ -547,11 +547,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     sendTherapyMessage,
     subscribeToPushNotifications,
   };
-  
-  if (isAuthenticated === undefined) {
-    // This prevents a flash of un-styled content or a blank screen on initial load
-    return null;
-  }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

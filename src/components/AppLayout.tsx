@@ -20,11 +20,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, logout, user } = useAppContext();
   const pathname = usePathname();
   const router = useRouter();
-  const [isMounted, setIsMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   const menuItems = [
     { name: 'Dashboard', url: '/', icon: LayoutDashboard },
@@ -50,33 +45,37 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, isAuthPage, router]);
 
-  // Don't render layout for auth pages, or if auth state is not yet determined/checked
-  if (isAuthPage || isAuthenticated === undefined || !isMounted) {
+  // If we are on an auth page, just render the children without the layout
+  if (isAuthPage) {
     return <>{children}</>;
   }
-  
-  if (!isAuthenticated && !isAuthPage) {
-    // Return null or a loader while redirecting
-    return null;
-  }
 
-  if (!user && !isAuthPage) {
-    return null; // Don't render if user is null and not on an auth page
-  }
+  // While the auth state is loading, or if the user is not authenticated yet,
+  // we render the layout shell with a loading indicator.
+  // The redirect for unauthenticated users will happen in the background.
+  const showLoading = isAuthenticated === undefined || isAuthenticated === false;
 
   return (
     <div className="relative min-h-screen w-full">
       <AnimeNavBar items={menuItems} />
-      <div className="fixed bottom-5 left-5 z-[9999]">
-        <button
-          onClick={logout}
-          className="flex items-center justify-center p-3 rounded-full bg-black/50 border border-white/10 text-white/70 hover:text-white transition-colors"
-        >
-          <LogOut size={18} />
-        </button>
-      </div>
+      {user && (
+        <div className="fixed bottom-5 left-5 z-[9999]">
+          <button
+            onClick={logout}
+            className="flex items-center justify-center p-3 rounded-full bg-black/50 border border-white/10 text-white/70 hover:text-white transition-colors"
+          >
+            <LogOut size={18} />
+          </button>
+        </div>
+      )}
       <main className="ml-20 md:ml-24 p-4 md:p-6 pt-8">
-        {children}
+        {showLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div>Loading...</div>
+          </div>
+        ) : (
+          children
+        )}
       </main>
     </div>
   );
