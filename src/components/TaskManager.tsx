@@ -356,11 +356,11 @@ export function TaskManager() {
       </motion.div>
 
       <Tabs defaultValue="today" className="flex flex-1 flex-col mt-4">
-        <TabsList>
-          <TabsTrigger value="today">Today</TabsTrigger>
-          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-          <TabsTrigger value="someday">Someday</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
+        <TabsList className="bg-transparent p-0 justify-start gap-4">
+          <TabsTrigger value="today" className="data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none p-2">Today</TabsTrigger>
+          <TabsTrigger value="upcoming" className="data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none p-2">Upcoming</TabsTrigger>
+          <TabsTrigger value="someday" className="data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none p-2">Someday</TabsTrigger>
+          <TabsTrigger value="completed" className="data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none p-2">Completed</TabsTrigger>
         </TabsList>
         <AnimatePresence mode="wait">
         <div className="mt-4 flex-1 space-y-2">
