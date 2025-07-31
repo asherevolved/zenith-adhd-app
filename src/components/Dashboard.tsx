@@ -66,23 +66,27 @@ const itemVariants = {
 export function Dashboard() {
   const { tasks, habits, profile, journalEntries, isLoadingSettings } = useAppContext();
 
-  const tasksCompleted = tasks.filter(t => t.isCompleted).length;
-  const totalTasks = tasks.length;
+  // Robust check to ensure all data is loaded before proceeding
+  const isDataReady = !isLoadingSettings && !!tasks && !!habits && !!profile && !!journalEntries;
+
+  const tasksCompleted = isDataReady ? tasks.filter(t => t.isCompleted).length : 0;
+  const totalTasks = isDataReady ? tasks.length : 0;
   const taskCompletionRate = totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0;
   
-  const activeHabits = habits.length;
+  const activeHabits = isDataReady ? habits.length : 0;
   
   const longestHabitStreak = React.useMemo(() => {
-    if (!habits || habits.length === 0) return 0;
+    if (!isDataReady || !habits || habits.length === 0) return 0;
     return habits.reduce((maxStreak, habit) => {
       return Math.max(maxStreak, habit.streak);
     }, 0);
-  }, [habits]);
+  }, [habits, isDataReady]);
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const habitsCompletedToday = habits.filter(h => h.completions[todayStr]).length;
+  const habitsCompletedToday = isDataReady ? habits.filter(h => h.completions[todayStr]).length : 0;
 
   const weeklyProgress = React.useMemo(() => {
+    if (!isDataReady) return [];
     const today = new Date();
     const weekStart = startOfWeek(today, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
@@ -98,12 +102,12 @@ export function Dashboard() {
         habits: habitsDone,
       };
     });
-  }, [tasks, habits]);
+  }, [tasks, habits, isDataReady]);
 
-  // A simple way to calculate "badges" or achievements
-  const badgesUnlocked = Math.floor(tasksCompleted / 5) + Math.floor(longestHabitStreak / 7);
+  const badgesUnlocked = isDataReady ? Math.floor(tasksCompleted / 5) + Math.floor(longestHabitStreak / 7) : 0;
+  const journalEntryCount = isDataReady ? journalEntries.length : 0;
 
-  if (isLoadingSettings || !tasks || !habits || !profile || !journalEntries) {
+  if (!isDataReady) {
      return (
         <div className="space-y-6">
             <div className="space-y-2">
@@ -204,7 +208,7 @@ export function Dashboard() {
               <BookHeart className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{journalEntries.length}</div>
+              <div className="text-2xl font-bold">{journalEntryCount}</div>
               <p className="text-xs text-muted-foreground">total entries</p>
             </CardContent>
           </Card>
@@ -232,6 +236,18 @@ export function Dashboard() {
               <p className="text-xs text-muted-foreground">of {activeHabits} habits</p>
             </CardContent>
           </Card>
+        </motion.div>
+         <motion.div variants={itemVariants}>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Progress</CardTitle>
+                <Target className="size-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                <div className="text-2xl font-bold">N/A</div>
+                <p className="text-xs text-muted-foreground">coming soon</p>
+                </CardContent>
+            </Card>
         </motion.div>
       </motion.div>
 
