@@ -18,6 +18,7 @@ export type Task = {
   subtasks: Subtask[];
   reminder?: number; // minutes
   created_at: string;
+  last_reminder_sent_at?: string;
 };
 
 export type Habit = {

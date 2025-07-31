@@ -34,6 +34,7 @@ interface AppContextType {
   deleteJournalEntry: (id: string) => void;
   updateSettings: (newSettings: UserSettings) => Promise<void>;
   sendTherapyMessage: (message: string) => Promise<void>;
+  subscribeToPushNotifications: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -65,8 +66,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [isLoadingTherapyHistory, setIsLoadingTherapyHistory] = useState(true);
   
   const subscribeToPushNotifications = useCallback(async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      console.warn('Push notifications are not supported in this browser.');
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !user) {
+      console.warn('Push notifications are not supported in this browser or user is not logged in.');
       return;
     }
 
@@ -77,6 +78,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (subscription) {
         // Already subscribed, maybe just ensure it's on our server
         await supabase.from('push_subscriptions').upsert({
+          user_id: user.id,
           subscription_payload: subscription.toJSON(),
         }, { onConflict: 'endpoint' });
         return;
@@ -95,6 +97,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       // Save subscription to the database
       const { error } = await supabase.from('push_subscriptions').insert({
+        user_id: user.id,
         subscription_payload: subscription.toJSON(),
       });
       if (error) {
@@ -107,7 +110,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Failed to subscribe to push notifications:', error);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -115,8 +118,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         .register('/sw.js')
         .then((registration) => {
           console.log('Service Worker registered with scope:', registration.scope);
-          // Check notification permission and subscribe if granted
-          if (Notification.permission === 'granted') {
+          // Check notification permission and subscribe if granted and user is logged in
+          if (Notification.permission === 'granted' && user) {
             subscribeToPushNotifications();
           }
         })
@@ -124,7 +127,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           console.error('Service Worker registration failed:', error);
         });
     }
-  }, [subscribeToPushNotifications]);
+  }, [subscribeToPushNotifications, user]);
 
 
   const loadUserData = useCallback(async (userId: string) => {
@@ -157,11 +160,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (journalRes.error) throw new Error(`Journal: ${journalRes.error.message}`);
       setJournalEntries(journalRes.data || []);
       
-      if (settingsRes.error && settingsRes.error.code !== 'PGRST116') throw new Error(`Settings: ${settingsRes.error.message}`);
-      setSettings(settingsRes.data || null);
+      if (settingsRes.error && settingsRes.error.code !== 'PGRST116') {
+        // Ignore "single row not found" for new users
+      } else {
+        setSettings(settingsRes.data || null);
+      }
       
-      if (profileRes.error && profileRes.error.code !== 'PGRST116') throw new Error(`Profile: ${profileRes.error.message}`);
-      setProfile(profileRes.data || null);
+      if (profileRes.error && profileRes.error.code !== 'PGRST116') {
+         // Ignore "single row not found" for new users
+      } else {
+        setProfile(profileRes.data || null);
+      }
 
       if (therapyRes.error) throw new Error(`Therapy: ${therapyRes.error.message}`);
       setTherapyMessages(therapyRes.data || []);
@@ -531,10 +540,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     deleteJournalEntry,
     updateSettings,
     sendTherapyMessage,
+    subscribeToPushNotifications,
   };
   
   if (isAuthenticated === undefined) {
-    return null; // Or a full-page loader
+    // This prevents a flash of un-styled content or a blank screen on initial load
+    return null;
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

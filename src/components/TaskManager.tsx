@@ -85,7 +85,7 @@ function TaskItem({ task, index }: { task: Task, index: number }) {
              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>Due: {format(new Date(task.due_date), 'PPP')}</span>
                 {task.reminder && !task.isCompleted && (
-                    <span className="flex items-center gap-1"><Bell className="size-3" /> {task.reminder} min before</span>
+                    <span className="flex items-center gap-1"><Bell className="size-3" /> Reminds every {task.reminder} min</span>
                 )}
             </div>
           </div>
@@ -139,7 +139,7 @@ function TaskItem({ task, index }: { task: Task, index: number }) {
 }
 
 export function TaskManager() {
-  const { tasks, addTask } = useAppContext();
+  const { tasks, addTask, subscribeToPushNotifications } = useAppContext();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [notificationPermission, setNotificationPermission] = React.useState('default');
@@ -173,6 +173,7 @@ export function TaskManager() {
     if (permission === 'granted') {
         toast({ title: 'Notifications enabled!', description: 'You will now receive task reminders.' });
         // The service worker registration and subscription is handled in AppContext
+        subscribeToPushNotifications();
     } else {
         toast({ title: 'Notifications blocked', description: 'To receive reminders, enable notifications in your browser settings.', variant: 'destructive' });
     }
@@ -305,13 +306,13 @@ export function TaskManager() {
                     </div>
                 </div>
                  <div>
-                  <Label htmlFor="reminder">Reminder (minutes before due)</Label>
+                  <Label htmlFor="reminder">Reminder Interval (minutes)</Label>
                    <Input 
                     id="reminder"
                     type="number"
                     value={newReminder}
                     onChange={(e) => setNewReminder(e.target.value)}
-                    placeholder="e.g. 15"
+                    placeholder="e.g. 15 for every 15 mins"
                     className="mt-1"
                     disabled={notificationPermission === 'denied'}
                    />
