@@ -240,7 +240,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signup = async (email: string, pass: string): Promise<boolean> => {
-    const { data, error } = await supabase.auth.signUp({ email, password: pass });
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password: pass,
+      options: {
+        data: {
+          email_confirm: false,
+        }
+      }
+    });
      if (error) {
       console.error('Signup error:', error.message);
       return false;

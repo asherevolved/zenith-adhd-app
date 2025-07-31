@@ -55,7 +55,7 @@ export function SignupForm() {
     if (success) {
       toast({
         title: 'Signup Successful',
-        description: "You're now logged in. Check your email to verify your account.",
+        description: "You're now logged in.",
       });
       router.push('/');
     } else {
