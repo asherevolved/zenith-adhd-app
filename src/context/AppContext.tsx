@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -141,14 +142,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         journalRes,
         settingsRes,
         profileRes,
-        therapyRes
       ] = await Promise.all([
         supabase.from('tasks').select('*, is_completed').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('user_settings').select('*').eq('id', userId).single(),
         supabase.from('profiles').select('*').eq('id', userId).single(),
-        supabase.from('therapy_chat_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
       ]);
       
       if (tasksRes.error) throw new Error(`Tasks: ${tasksRes.error.message}`);
@@ -172,14 +171,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setProfile(profileRes.data || null);
       }
 
-      if (therapyRes.error) throw new Error(`Therapy: ${therapyRes.error.message}`);
-      setTherapyMessages(therapyRes.data || []);
-
     } catch (error: any) {
         console.error("Failed to load user data from Supabase", error.message);
         toast({ title: 'Error Loading Data', description: 'Could not load your data. Some features might be unavailable.', variant: 'destructive' });
     } finally {
       setIsLoadingSettings(false);
+    }
+
+    // Load therapy messages separately
+    try {
+       const { data: therapyRes, error: therapyError } = await supabase.from('therapy_chat_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true });
+       if (therapyError) throw therapyError;
+       setTherapyMessages(therapyRes || []);
+    } catch(error: any) {
+        console.error("Failed to load therapy messages", error.message);
+        toast({ title: 'Error Loading Chat', description: 'Could not load chat history.', variant: 'destructive' });
+    } finally {
       setIsLoadingTherapyHistory(false);
     }
   }, [toast]);
@@ -253,9 +260,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       email, 
       password: pass,
       options: {
-        data: {
-          email_confirm: false,
-        }
+        email_confirm: false,
       }
     });
      if (error) {
